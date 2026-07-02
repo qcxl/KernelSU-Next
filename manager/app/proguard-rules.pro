@@ -37,3 +37,5 @@
 -dontwarn javax.lang.model.util.SimpleTypeVisitor8
 -dontwarn javax.lang.model.util.Types
 -dontwarn javax.tools.Diagnostic$Kind
+# Keep RootServerMain for root process classloading
+-keep class com.topjohnwu.superuser.internal.** { *; }
