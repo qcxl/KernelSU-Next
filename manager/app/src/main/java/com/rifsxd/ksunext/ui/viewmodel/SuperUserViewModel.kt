@@ -30,12 +30,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.parcelize.Parcelize
 import java.text.Collator
 import java.util.*
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-import kotlin.coroutines.suspendCoroutine
 
 class SuperUserViewModel : ViewModel() {
 
@@ -130,7 +130,7 @@ class SuperUserViewModel : ViewModel() {
 
     private suspend inline fun connectKsuService(
         crossinline onDisconnect: () -> Unit = {}
-    ): Pair<IBinder, ServiceConnection> = suspendCoroutine { continuation ->
+    ): Pair<IBinder, ServiceConnection> = suspendCancellableCoroutine { continuation ->
         val connection = object : ServiceConnection {
             override fun onServiceDisconnected(name: ComponentName?) {
                 onDisconnect()
