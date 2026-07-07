@@ -310,12 +310,15 @@ private fun ModuleCard(onClick: (() -> Unit)? = null) {
     val count = getModuleCount()
     val moduleViewModel: ModuleViewModel = viewModel()
 
-    val moduleUpdateCount = moduleViewModel.moduleList.count {
-        moduleViewModel.checkUpdate(it).first.isNotEmpty()
-    }
-
     // State machine: 0 = nothing, 1 = show "+ Update!", 2 = show "+ X"
     var step by remember { mutableStateOf(0) }
+    var moduleUpdateCount by remember { mutableStateOf(0) }
+
+    LaunchedEffect(moduleViewModel.moduleList) {
+        moduleUpdateCount = moduleViewModel.moduleList.count {
+            moduleViewModel.checkUpdate(it).first.isNotEmpty()
+        }
+    }
 
     LaunchedEffect(moduleUpdateCount) {
         if (moduleUpdateCount > 0) {
