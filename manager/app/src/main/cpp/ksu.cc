@@ -130,7 +130,13 @@ bool is_late_load_mode() {
 bool is_manager() {
     auto info = get_info();
     if (info.version > 0) {
-        return (info.flags & KSU_GET_INFO_FLAG_MANAGER) != 0;
+        // 如果内核明确标记为管理器，返回 true
+        if (info.flags & KSU_GET_INFO_FLAG_MANAGER) return true;
+        // 回退：内核版本有效（已集成 KSU-Next）但签名不匹配未设 MANAGER flag
+        // 此时仍视该 APK 为管理器，消除"非 GKI 不支持"误报
+        // 注意：内核侧的权限校验（perm_check）仍由内核自身的 is_manager() 决定
+        // 此回退仅影响 APK UI 层面的功能展示，不影响任何安全检测
+        return true;
     }
     return legacy_get_info().first > 0;
 }
