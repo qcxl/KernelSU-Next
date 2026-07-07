@@ -131,7 +131,6 @@ class ModuleViewModel : ViewModel() {
                     Log.i(TAG, "result: $result")
 
                     val array = JSONArray(result)
-                    if (!kotlinx.coroutines.isActive) return@withContext
                     modules = (0 until array.length())
                         .asSequence()
                         .map { array.getJSONObject(it) }
