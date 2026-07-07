@@ -309,7 +309,12 @@ internal fun parseSulogTimestampText(
     val bootTimeMillis = currentTimeMillis - uptimeMillis
     if (bootTimeMillis < 0) return null
 
-    val eventTimeMillis = bootTimeMillis + (timestampNanos / NS_PER_MILLISECOND)
+    // Guard against arithmetic overflow for extreme values
+    val eventTimeMillis = try {
+        Math.addExact(bootTimeMillis, Math.floorDiv(timestampNanos, NS_PER_MILLISECOND))
+    } catch (_: ArithmeticException) {
+        return null
+    }
     if (eventTimeMillis < 0) return null
 
     return Instant.ofEpochMilli(eventTimeMillis)

@@ -262,6 +262,9 @@
     <string name="module_shortcut_pick_icon">Pick an Icon</string>
     <string name="set_selinux">SELinux Permissive</string>
     <string name="set_selinux_summary">Set SELinux to permissive mode.</string>
+    <string name="selinux_permissive_enabled">SELinux set to Permissive</string>
+    <string name="selinux_enforcing_enabled">SELinux set to Enforcing</string>
+    <string name="selinux_set_failed">Failed to set SELinux mode: %s</string>
     <string name="main">Main</string>
     <string name="spoofed">Spoofed</string>
     <string name="select_build_type">Select build type</string>

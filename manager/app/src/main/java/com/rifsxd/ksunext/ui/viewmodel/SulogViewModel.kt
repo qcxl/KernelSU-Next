@@ -87,7 +87,6 @@ class SulogViewModel : ViewModel() {
                     files = files,
                     selectedFilePath = selectedFile?.path,
                     entries = entries,
-                    visibleEntries = currentState.visibleEntries,
                 )
             }.onSuccess { state ->
                 _uiState.value = state
@@ -121,10 +120,10 @@ class SulogViewModel : ViewModel() {
     }
 
     fun cleanFile() {
-        val currentState = _uiState.value
-        val path = currentState.selectedFilePath ?: return
-        val cleanAction = resolveSulogFileCleanAction(currentState.files, path)
         viewModelScope.launch(Dispatchers.IO) {
+            val currentState = _uiState.value
+            val path = currentState.selectedFilePath ?: return@launch
+            val cleanAction = resolveSulogFileCleanAction(currentState.files, path)
             when (cleanAction) {
                 SulogFileCleanAction.Clear -> cleanSulogFile(path)
                 SulogFileCleanAction.Delete -> deleteSulogFile(path)

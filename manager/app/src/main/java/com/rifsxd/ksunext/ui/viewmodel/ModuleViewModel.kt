@@ -28,8 +28,9 @@ class ModuleViewModel : ViewModel() {
 
     companion object {
         private const val TAG = "ModuleViewModel"
-        private var modules by mutableStateOf<List<ModuleInfo>>(emptyList())
     }
+
+    private var modules by mutableStateOf<List<ModuleInfo>>(emptyList())
 
     class ModuleInfo(
         val id: String,
@@ -74,6 +75,8 @@ class ModuleViewModel : ViewModel() {
     var sortActionFirst by mutableStateOf(false)
     var sortWebUiFirst by mutableStateOf(false)
 
+    private var refreshJob: kotlinx.coroutines.Job? = null
+
     val moduleList by derivedStateOf {
         val comparator = when {
             sortWebUiFirst -> compareByDescending { it.hasWebUi }
@@ -114,8 +117,8 @@ class ModuleViewModel : ViewModel() {
     }
 
     fun fetchModuleList() {
-        
-        viewModelScope.launch {
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch {
 
             isRefreshing = true
 
@@ -128,6 +131,7 @@ class ModuleViewModel : ViewModel() {
                     Log.i(TAG, "result: $result")
 
                     val array = JSONArray(result)
+                    if (!kotlinx.coroutines.isActive) return@withContext
                     modules = (0 until array.length())
                         .asSequence()
                         .map { array.getJSONObject(it) }
@@ -169,7 +173,6 @@ class ModuleViewModel : ViewModel() {
                     isNeedRefresh = false
                 }.onFailure { e ->
                     Log.e(TAG, "fetchModuleList: ", e)
-                    isRefreshing = false
                 }
 
                 // when both old and new is kotlin.collections.EmptyList
@@ -180,6 +183,7 @@ class ModuleViewModel : ViewModel() {
 
                 Log.i(TAG, "load cost: ${SystemClock.elapsedRealtime() - start}, modules: $modules")
             }
+            if (isRefreshing) isRefreshing = false
         }
     }
 
@@ -187,10 +191,10 @@ class ModuleViewModel : ViewModel() {
         return version.replace(Regex("[^a-zA-Z0-9.\\-_]"), "_")
     }
 
-    fun checkUpdate(m: ModuleInfo): Triple<String, String, String> {
+    suspend fun checkUpdate(m: ModuleInfo): Triple<String, String, String> = withContext(Dispatchers.IO) {
         val empty = Triple("", "", "")
         if (m.updateJson.isEmpty() || m.remove || m.update || !m.enabled) {
-            return empty
+            return@withContext empty
         }
         // download updateJson
         val result = kotlin.runCatching {
@@ -209,12 +213,12 @@ class ModuleViewModel : ViewModel() {
         Log.i(TAG, "checkUpdate result: $result")
 
         if (result.isEmpty()) {
-            return empty
+            return@withContext empty
         }
 
         val updateJson = kotlin.runCatching {
             JSONObject(result)
-        }.getOrNull() ?: return empty
+        }.getOrNull() ?: return@withContext empty
 
         var version = updateJson.optString("version", "")
         version = sanitizeVersionString(version)
@@ -222,9 +226,9 @@ class ModuleViewModel : ViewModel() {
         val zipUrl = updateJson.optString("zipUrl", "")
         val changelog = updateJson.optString("changelog", "")
         if (versionCode <= m.versionCode || zipUrl.isEmpty()) {
-            return empty
+            return@withContext empty
         }
 
-        return Triple(zipUrl, version, changelog)
+        return@withContext Triple(zipUrl, version, changelog)
     }
 }

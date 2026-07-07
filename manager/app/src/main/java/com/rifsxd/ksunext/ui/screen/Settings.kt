@@ -398,6 +398,25 @@ private fun SecurityCard(
                 val shouldEnforce = !checked
                 if (setSelinuxEnforce(shouldEnforce)) {
                     isSelinuxPermissive = !shouldEnforce
+                    if (checked) {
+                        Toast.makeText(
+                            context,
+                            R.string.selinux_permissive_enabled,
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        Toast.makeText(
+                            context,
+                            R.string.selinux_enforcing_enabled,
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                } else {
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.selinux_set_failed, if (checked) "0" else "1"),
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
             }
 

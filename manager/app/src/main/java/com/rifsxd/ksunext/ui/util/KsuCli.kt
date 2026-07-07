@@ -164,20 +164,57 @@ fun restoreModule(id: String): Boolean {
 }
 
 fun getSelinuxEnforce(): Boolean? {
-    return runCatching {
-        val out = ShellUtils.fastCmd("getenforce").trim()
+    // First attempt: use getenforce command with a fresh root shell
+    val fromCommand = runCatching {
+        withNewRootShell {
+            ShellUtils.fastCmd(this, "getenforce").trim()
+        }
+    }.getOrNull()
+
+    fromCommand?.let {
         when {
-            out.equals("Enforcing", ignoreCase = true) -> true
-            out.equals("Permissive", ignoreCase = true) -> false
-            else -> null
+            it.equals("Enforcing", ignoreCase = true) -> return true
+            it.equals("Permissive", ignoreCase = true) -> return false
+        }
+    }
+
+    // Fallback: read /sys/fs/selinux/enforce directly via SuFile (root-aware)
+    return runCatching {
+        SuFile("/sys/fs/selinux/enforce").run {
+            when {
+                !exists() -> false // SELinux disabled → permissive-like
+                !isFile -> null
+                !canRead() -> true // can't read → enforcing
+                else -> newInputStream().bufferedReader()
+                    .use { it.readLine()?.trim()?.toIntOrNull() }
+                    ?.let { it == 1 }
+            }
         }
     }.getOrNull()
 }
 
 fun setSelinuxEnforce(enforce: Boolean): Boolean {
-    return runCatching {
+    // First attempt: use setenforce command with a fresh root shell
+    val fromCommand = runCatching {
         val valStr = if (enforce) "1" else "0"
-        ShellUtils.fastCmdResult("setenforce $valStr")
+        withNewRootShell {
+            ShellUtils.fastCmdResult(this, "setenforce $valStr")
+        }
+    }.getOrDefault(false)
+
+    if (fromCommand) return true
+
+    // Fallback: write directly to /sys/fs/selinux/enforce via SuFile (root-aware)
+    return runCatching {
+        val valBytes = if (enforce) "1".toByteArray() else "0".toByteArray()
+        SuFile("/sys/fs/selinux/enforce").run {
+            if (exists() && isFile) {
+                newOutputStream().use { it.write(valBytes) }
+                true
+            } else {
+                false
+            }
+        }
     }.getOrDefault(false)
 }
 

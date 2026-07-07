@@ -27,11 +27,14 @@ import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.parcelize.Parcelize
 import java.text.Collator
 import java.util.*
 import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
 
 class SuperUserViewModel : ViewModel() {
@@ -76,6 +79,7 @@ class SuperUserViewModel : ViewModel() {
     }
 
     private val prefs = ksuApp.getSharedPreferences("settings", Context.MODE_PRIVATE)!!
+    private val mutex = Mutex()
 
     var search by mutableStateOf("")
     var showSystemApps by mutableStateOf(prefs.getBoolean("show_system_apps", false))
@@ -126,25 +130,42 @@ class SuperUserViewModel : ViewModel() {
 
     private suspend inline fun connectKsuService(
         crossinline onDisconnect: () -> Unit = {}
-    ): Pair<IBinder, ServiceConnection> = suspendCoroutine {
+    ): Pair<IBinder, ServiceConnection> = suspendCoroutine { continuation ->
         val connection = object : ServiceConnection {
             override fun onServiceDisconnected(name: ComponentName?) {
                 onDisconnect()
+                if (continuation.isActive) {
+                    continuation.resumeWithException(RuntimeException("KsuService disconnected"))
+                }
             }
 
             override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-                it.resume(binder as IBinder to this)
+                if (!continuation.isActive) return
+                if (binder != null) {
+                    continuation.resume(binder as IBinder to this)
+                } else {
+                    continuation.resumeWithException(RuntimeException("Null binder from KsuService"))
+                }
             }
         }
 
         val intent = Intent(ksuApp, KsuService::class.java)
-
-        val task = RootService.bindOrTask(
-            intent,
-            Shell.EXECUTOR,
-            connection,
-        )
-        task?.let { it1 -> Shell.getShell().execTask(it1) }
+        try {
+            val task = RootService.bindOrTask(
+                intent,
+                Shell.EXECUTOR,
+                connection,
+            )
+            if (task != null) {
+                Shell.getShell().execTask(task)
+            } else {
+                continuation.resumeWithException(RuntimeException("Failed to bind KsuService: bindOrTask returned null"))
+            }
+        } catch (e: Exception) {
+            if (continuation.isActive) {
+                continuation.resumeWithException(RuntimeException("Failed to bind KsuService", e))
+            }
+        }
     }
 
     private fun stopKsuService() {
@@ -153,38 +174,48 @@ class SuperUserViewModel : ViewModel() {
     }
 
     suspend fun fetchAppList() {
-        Mutex().withLock {
+        mutex.withLock {
 
             isRefreshing = true
 
-            val result = connectKsuService {
-                Log.w(TAG, "KsuService disconnected")
-            }
-
-            withContext(Dispatchers.IO) {
-                val pm = ksuApp.packageManager
-                val start = SystemClock.elapsedRealtime()
-
-                val binder = result.first
-                val allPackages = IKsuInterface.Stub.asInterface(binder).getPackages(0)
-
-                withContext(Dispatchers.Main) {
-                    stopKsuService()
+            try {
+                val result = withTimeout(10_000) {
+                    connectKsuService {
+                        Log.w(TAG, "KsuService disconnected")
+                    }
                 }
 
-                val packages = allPackages.list
+                withContext(Dispatchers.IO) {
+                    val pm = ksuApp.packageManager
+                    val start = SystemClock.elapsedRealtime()
 
-                apps = packages.map {
-                    val appInfo = it.applicationInfo
-                    val uid = appInfo!!.uid
-                    val profile = Natives.getAppProfile(it.packageName, uid)
-                    AppInfo(
-                        label = appInfo.loadLabel(pm).toString(),
-                        packageInfo = it,
-                        profile = profile,
-                    )
+                    val binder = result.first
+                    val allPackages = IKsuInterface.Stub.asInterface(binder).getPackages(0)
+
+                    withContext(Dispatchers.Main) {
+                        stopKsuService()
+                    }
+
+                    val packages = allPackages.list
+
+                    apps = packages.map {
+                        val appInfo = it.applicationInfo
+                        val uid = appInfo!!.uid
+                        val profile = Natives.getAppProfile(it.packageName, uid)
+                        AppInfo(
+                            label = appInfo.loadLabel(pm).toString(),
+                            packageInfo = it,
+                            profile = profile,
+                        )
+                    }
+                    Log.i(TAG, "load cost: ${SystemClock.elapsedRealtime() - start}")
                 }
-                Log.i(TAG, "load cost: ${SystemClock.elapsedRealtime() - start}")
+            } catch (e: TimeoutCancellationException) {
+                Log.w(TAG, "fetchAppList timed out", e)
+                isRefreshing = false
+            } catch (e: Exception) {
+                Log.w(TAG, "fetchAppList failed", e)
+                isRefreshing = false
             }
         }
     }

@@ -223,6 +223,9 @@
   <string name="module_shortcut_pick_icon">选择一个图标</string>
   <string name="set_selinux">SELinux 宽容模式</string>
   <string name="set_selinux_summary">设置 SELinux 为宽容模式。</string>
+  <string name="selinux_permissive_enabled">SELinux 已设为宽容模式</string>
+  <string name="selinux_enforcing_enabled">SELinux 已设为强制模式</string>
+  <string name="selinux_set_failed">设置 SELinux 模式失败: %s</string>
   <string name="main">主要的</string>
   <string name="spoofed">伪装的</string>
   <string name="select_build_type">选择构建类型</string>

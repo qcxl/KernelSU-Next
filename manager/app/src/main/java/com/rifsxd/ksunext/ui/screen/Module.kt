@@ -112,7 +112,7 @@ fun ModuleScreen(navigator: DestinationsNavigator) {
         }
     }
 
-    val hasMagisk = hasMagisk()
+    val hasMagisk = remember { hasMagisk() }
 
     val hideInstallButton = hasMagisk
 
@@ -553,9 +553,10 @@ private fun ModuleList(
         val changelogResult = loadingDialog.withLoading {
             withContext(Dispatchers.IO) {
                 runCatching {
-                    ksuApp.okhttpClient.newCall(
+                    val response = ksuApp.okhttpClient.newCall(
                         okhttp3.Request.Builder().url(changelogUrl).build()
-                    ).execute().body!!.string()
+                    ).execute()
+                    response.body?.string() ?: ""
                 }
             }
         }
@@ -712,9 +713,7 @@ private fun ModuleList(
                     items(viewModel.moduleList) { module ->
                         val scope = rememberCoroutineScope()
                         val updatedModule by produceState(key1 = module.id, initialValue = Triple("", "", "")) {
-                            value = withContext(Dispatchers.IO) {
-                                viewModel.checkUpdate(module)
-                            }
+                            value = viewModel.checkUpdate(module)
                         }
 
                         ModuleItem(
@@ -1408,7 +1407,7 @@ fun ModuleItem(
 }
 
 fun formatSize(size: Long): String {
-    if (size == 0L) return "null"
+    if (size == 0L) return "0 B"
     val kb = 1024
     val mb = kb * 1024
     val gb = mb * 1024
