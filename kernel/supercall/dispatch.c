@@ -120,15 +120,11 @@ static int do_report_event(void __user *arg)
         break;
     }
     case EVENT_BOOT_COMPLETED: {
-        static bool boot_complete_lock = false;
-        if (!boot_complete_lock) {
-            boot_complete_lock = true;
-            if (ksu_late_loaded) {
-                pr_debug("boot_complete skipped (late load)\n");
-            } else {
-                pr_debug("boot_complete triggered\n");
-                on_boot_completed();
-            }
+        if (ksu_late_loaded) {
+            pr_debug("boot_complete skipped (late load)\n");
+        } else {
+            pr_debug("boot_complete triggered\n");
+            on_boot_completed();
         }
         break;
     }
