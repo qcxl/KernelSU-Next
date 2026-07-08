@@ -25,7 +25,7 @@ int ksu_handle_setresuid(uid_t old_uid, uid_t new_uid)
 {
     // we rely on the fact that zygote always call setresuid(3) with same uids
 
-    pr_info("handle_setresuid from %d to %d\n", old_uid, new_uid);
+    pr_debug("handle_setresuid from %d to %d\n", old_uid, new_uid);
 
     if (unlikely(is_uid_manager(new_uid))) {
         spin_lock_irq(&current->sighand->siglock);
@@ -33,7 +33,7 @@ int ksu_handle_setresuid(uid_t old_uid, uid_t new_uid)
         ksu_set_task_tracepoint_flag(current);
         spin_unlock_irq(&current->sighand->siglock);
 
-        pr_info("install fd for manager: %d\n", new_uid);
+        pr_debug("install fd for manager: %d\n", new_uid);
         ksu_install_fd();
         return 0;
     }
@@ -63,6 +63,6 @@ void __init ksu_setuid_hook_init(void)
 
 void __exit ksu_setuid_hook_exit(void)
 {
-    pr_info("ksu_core_exit\n");
+    pr_debug("ksu_core_exit\n");
     ksu_kernel_umount_exit();
 }

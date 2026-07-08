@@ -30,7 +30,7 @@ struct ksu_install_fd_tw {
 
 static int anon_ksu_release(struct inode *inode, struct file *filp)
 {
-    pr_info("ksu fd released\n");
+    pr_debug("ksu fd released\n");
     return 0;
 }
 
@@ -65,7 +65,7 @@ int ksu_install_fd(void)
     }
 
     fd_install(fd, filp);
-    pr_info("ksu fd installed: %d for pid %d\n", fd, current->pid);
+    pr_debug("ksu fd installed: %d for pid %d\n", fd, current->pid);
     return fd;
 }
 
@@ -74,7 +74,7 @@ static void ksu_install_fd_tw_func(struct callback_head *cb)
     struct ksu_install_fd_tw *tw = container_of(cb, struct ksu_install_fd_tw, cb);
     int fd = ksu_install_fd();
 
-    pr_info("[%d] install ksu fd: %d\n", current->pid, fd);
+    pr_debug("[%d] install ksu fd: %d\n", current->pid, fd);
     if (copy_to_user(tw->outp, &fd, sizeof(fd))) {
         pr_err("install ksu fd reply err\n");
         ksu_close_fd(fd);
@@ -105,7 +105,7 @@ static int reboot_handler_pre(struct kprobe *p, struct pt_regs *regs)
 
         if (task_work_add(current, &tw->cb, TWA_RESUME)) {
             kfree(tw);
-            pr_warn("install fd add task_work failed\n");
+            pr_debug("install fd add task_work failed\n");
         }
     }
 
@@ -114,12 +114,12 @@ static int reboot_handler_pre(struct kprobe *p, struct pt_regs *regs)
         if (current_uid().val != 0)
             return 0;
 
-        pr_info("sys_reboot: ksu_set_manager_appid to: %d\n", cmd);
+        pr_debug("sys_reboot: ksu_set_manager_appid to: %d\n", cmd);
         ksu_set_manager_appid(cmd);
 
         if (cmd == ksu_get_manager_appid()) {
             if (copy_to_user((void __user *)arg4, &reply, sizeof(reply)))
-                pr_info("sys_reboot: reply fail\n");
+                pr_debug("sys_reboot: reply fail\n");
         }
 
         return 0;
@@ -141,7 +141,7 @@ static int reboot_handler_pre(struct kprobe *p, struct pt_regs *regs)
         if (current_uid().val != 0)
             return 0;
 
-        pr_info("sys_reboot: ksu_change_ksuver to: %d\n", cmd);
+        pr_debug("sys_reboot: ksu_change_ksuver to: %d\n", cmd);
         ksuver_override = cmd;
 
         if (copy_to_user((void __user *)arg4, &reply, sizeof(reply) ))
@@ -168,13 +168,13 @@ static int reboot_handler_pre(struct kprobe *p, struct pt_regs *regs)
         uint64_t u_pptr = 0;
         uint64_t u_ptr = 0;
 
-        pr_info("sys_reboot: ppptr: 0x%lx \n", (uintptr_t)ppptr);
+        pr_debug("sys_reboot: ppptr: 0x%lx \n", (uintptr_t)ppptr);
 
         // arg here is ***, pull out user-space ** via copy_from_user
         if (copy_from_user(&u_pptr, ppptr, sizeof(u_pptr)))
             return 0;
 
-        pr_info("sys_reboot: u_pptr: 0x%lx \n", (uintptr_t)u_pptr);
+        pr_debug("sys_reboot: u_pptr: 0x%lx \n", (uintptr_t)u_pptr);
 
         // now we got the __user **
         // we cannot dereference this as this is __user
@@ -182,7 +182,7 @@ static int reboot_handler_pre(struct kprobe *p, struct pt_regs *regs)
         if (copy_from_user(&u_ptr, (void __user *)u_pptr, sizeof(u_ptr)))
             return 0;
 
-        pr_info("sys_reboot: u_ptr: 0x%lx \n", (uintptr_t)u_ptr);
+        pr_debug("sys_reboot: u_ptr: 0x%lx \n", (uintptr_t)u_ptr);
 
         // for release
         if (strncpy_from_user(release_buf, (char __user *)u_ptr, sizeof(release_buf)) < 0)
@@ -199,7 +199,7 @@ static int reboot_handler_pre(struct kprobe *p, struct pt_regs *regs)
             // we save current version as the original before modifying
             strscpy(original_release_buf, u_curr->release, sizeof(original_release_buf));
             strscpy(original_version_buf, u_curr->version, sizeof(original_version_buf));
-            pr_info("sys_reboot: original uname saved: %s %s\n", original_release_buf, original_version_buf);
+            pr_debug("sys_reboot: original uname saved: %s %s\n", original_release_buf, original_version_buf);
         }
 
         // so user can reset
@@ -208,7 +208,7 @@ static int reboot_handler_pre(struct kprobe *p, struct pt_regs *regs)
             memcpy(version_buf, original_version_buf, sizeof(version_buf));
         }
 
-        pr_info("sys_reboot: spoofing kernel to: %s - %s\n", release_buf, version_buf);
+        pr_debug("sys_reboot: spoofing kernel to: %s - %s\n", release_buf, version_buf);
 
         struct new_utsname *u = utsname();
 
@@ -240,7 +240,7 @@ void __init ksu_supercalls_init(void)
     if (rc) {
         pr_err("reboot kprobe failed: %d\n", rc);
     } else {
-        pr_info("reboot kprobe registered successfully\n");
+        pr_debug("reboot kprobe registered successfully\n");
     }
 }
 

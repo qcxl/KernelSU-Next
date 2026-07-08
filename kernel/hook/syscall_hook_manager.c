@@ -35,7 +35,7 @@ static struct kretprobe *init_kretprobe(const char *name, kretprobe_handler_t ha
     rp->maxactive = 0;
 
     int ret = register_kretprobe(rp);
-    pr_info("hook_manager: register_%s kretprobe: %d\n", name, ret);
+    pr_debug("hook_manager: register_%s kretprobe: %d\n", name, ret);
     if (ret) {
         kfree(rp);
         return NULL;
@@ -124,7 +124,7 @@ static void ksu_sys_enter_handler(void *data, struct pt_regs *regs, long id)
 void __init ksu_syscall_hook_manager_init(void)
 {
     int ret;
-    pr_info("hook_manager: ksu_hook_manager_init called\n");
+    pr_debug("hook_manager: ksu_hook_manager_init called\n");
 
 #ifdef CONFIG_KRETPROBES
     syscall_regfunc_rp = init_kretprobe("syscall_regfunc", syscall_regfunc_handler);
@@ -145,7 +145,7 @@ void __init ksu_syscall_hook_manager_init(void)
     if (ret) {
         pr_err("hook_manager: failed to register sys_enter tracepoint: %d\n", ret);
     } else {
-        pr_info("hook_manager: sys_enter tracepoint registered\n");
+        pr_debug("hook_manager: sys_enter tracepoint registered\n");
     }
 #endif
 
@@ -156,11 +156,11 @@ void __init ksu_syscall_hook_manager_init(void)
 
 void __exit ksu_syscall_hook_manager_exit(void)
 {
-    pr_info("hook_manager: ksu_hook_manager_exit called\n");
+    pr_debug("hook_manager: ksu_hook_manager_exit called\n");
 #ifdef CONFIG_HAVE_SYSCALL_TRACEPOINTS
     unregister_trace_sys_enter(ksu_sys_enter_handler, NULL);
     tracepoint_synchronize_unregister();
-    pr_info("hook_manager: sys_enter tracepoint unregistered\n");
+    pr_debug("hook_manager: sys_enter tracepoint unregistered\n");
 #endif
 
 #ifdef CONFIG_KRETPROBES

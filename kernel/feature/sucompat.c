@@ -41,7 +41,7 @@ static int su_compat_feature_set(u64 value)
 {
 	bool enable = value != 0;
 	ksu_su_compat_enabled = enable;
-	pr_info("su_compat: set to %d\n", enable);
+	pr_debug("su_compat: set to %d\n", enable);
 	return 0;
 }
 
@@ -106,7 +106,7 @@ long ksu_handle_faccessat_sucompat(int orig_nr, struct pt_regs *regs)
 		old_cred = override_creds(ksu_cred);
 		if (is_ksud_exists()) {
 			ksu_compat_sulog('a');
-			pr_info("faccessat su->ksud!\n");
+			pr_debug("faccessat su->ksud!\n");
 			orig_filename = *filename_user;
 			*filename_user = ksud_user_path();
 			ret = ksu_syscall_table[orig_nr](regs);
@@ -142,7 +142,7 @@ long ksu_handle_stat_sucompat(int orig_nr, struct pt_regs *regs)
 		old_cred = override_creds(ksu_cred);
 		if (is_ksud_exists()) {
 			ksu_compat_sulog('s');
-			pr_info("newfstatat su->ksud!\n");
+			pr_debug("newfstatat su->ksud!\n");
 			orig_filename = *filename_user;
 			*filename_user = ksud_user_path();
 			ret = ksu_syscall_table[orig_nr](regs);
@@ -182,7 +182,7 @@ long ksu_handle_execve_sucompat(const char __user **filename_user, int orig_nr, 
 	ret = strncpy_from_user(path, fn, sizeof(path));
 
 	if (ret < 0) {
-		pr_warn("Access filename when execve failed: %ld", ret);
+		pr_debug("Access filename when execve failed: %ld", ret);
 		goto do_orig_execve;
 	}
 
@@ -190,7 +190,7 @@ long ksu_handle_execve_sucompat(const char __user **filename_user, int orig_nr, 
 		goto do_orig_execve;
 
 	ksu_compat_sulog('x');
-	pr_info("sys_execve su found\n");
+	pr_debug("sys_execve su found\n");
 
 	tmp_fd = get_unused_fd_flags(O_CLOEXEC);
 	if (tmp_fd < 0) {

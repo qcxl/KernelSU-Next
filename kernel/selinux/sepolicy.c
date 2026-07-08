@@ -214,7 +214,7 @@ static bool add_rule(struct policydb *db, const char *s, const char *t,
     if (s) {
         src = symtab_search(&db->p_types, s);
         if (src == NULL) {
-            pr_info("source type %s does not exist\n", s);
+            pr_debug("source type %s does not exist\n", s);
             return false;
         }
     }
@@ -222,7 +222,7 @@ static bool add_rule(struct policydb *db, const char *s, const char *t,
     if (t) {
         tgt = symtab_search(&db->p_types, t);
         if (tgt == NULL) {
-            pr_info("target type %s does not exist\n", t);
+            pr_debug("target type %s does not exist\n", t);
             return false;
         }
     }
@@ -230,14 +230,14 @@ static bool add_rule(struct policydb *db, const char *s, const char *t,
     if (c) {
         cls = symtab_search(&db->p_classes, c);
         if (cls == NULL) {
-            pr_info("class %s does not exist\n", c);
+            pr_debug("class %s does not exist\n", c);
             return false;
         }
     }
 
     if (p) {
         if (c == NULL) {
-            pr_info("No class is specified, cannot add perm [%s] \n", p);
+            pr_debug("No class is specified, cannot add perm [%s] \n", p);
             return false;
         }
 
@@ -246,7 +246,7 @@ static bool add_rule(struct policydb *db, const char *s, const char *t,
             perm = symtab_search(&cls->comdatum->permissions, p);
         }
         if (perm == NULL) {
-            pr_info("perm %s does not exist in class %s\n", p, c);
+            pr_debug("perm %s does not exist in class %s\n", p, c);
             return false;
         }
     }
@@ -411,7 +411,7 @@ static void add_xperm_rule_raw(struct policydb *db, struct type_datum *src,
 
         node = get_avtab_node(db, &key, &xperms);
         if (!node) {
-            pr_warn("add_xperm_rule_raw cannot found node!\n");
+            pr_debug("add_xperm_rule_raw cannot found node!\n");
             return;
         }
         datum = &node->datum;
@@ -438,7 +438,7 @@ static bool add_xperm_rule(struct policydb *db, const char *s, const char *t,
     if (s) {
         src = symtab_search(&db->p_types, s);
         if (src == NULL) {
-            pr_info("source type %s does not exist\n", s);
+            pr_debug("source type %s does not exist\n", s);
             return false;
         }
     }
@@ -446,7 +446,7 @@ static bool add_xperm_rule(struct policydb *db, const char *s, const char *t,
     if (t) {
         tgt = symtab_search(&db->p_types, t);
         if (tgt == NULL) {
-            pr_info("target type %s does not exist\n", t);
+            pr_debug("target type %s does not exist\n", t);
             return false;
         }
     }
@@ -454,7 +454,7 @@ static bool add_xperm_rule(struct policydb *db, const char *s, const char *t,
     if (c) {
         cls = symtab_search(&db->p_classes, c);
         if (cls == NULL) {
-            pr_info("class %s does not exist\n", c);
+            pr_debug("class %s does not exist\n", c);
             return false;
         }
     }
@@ -485,22 +485,22 @@ static bool add_type_rule(struct policydb *db, const char *s, const char *t,
 
     src = symtab_search(&db->p_types, s);
     if (src == NULL) {
-        pr_info("source type %s does not exist\n", s);
+        pr_debug("source type %s does not exist\n", s);
         return false;
     }
     tgt = symtab_search(&db->p_types, t);
     if (tgt == NULL) {
-        pr_info("target type %s does not exist\n", t);
+        pr_debug("target type %s does not exist\n", t);
         return false;
     }
     cls = symtab_search(&db->p_classes, c);
     if (cls == NULL) {
-        pr_info("class %s does not exist\n", c);
+        pr_debug("class %s does not exist\n", c);
         return false;
     }
     def = symtab_search(&db->p_types, d);
     if (def == NULL) {
-        pr_info("default type %s does not exist\n", d);
+        pr_debug("default type %s does not exist\n", d);
         return false;
     }
 
@@ -569,22 +569,22 @@ static bool add_filename_trans(struct policydb *db, const char *s,
 
     src = symtab_search(&db->p_types, s);
     if (src == NULL) {
-        pr_warn("source type %s does not exist\n", s);
+        pr_debug("source type %s does not exist\n", s);
         return false;
     }
     tgt = symtab_search(&db->p_types, t);
     if (tgt == NULL) {
-        pr_warn("target type %s does not exist\n", t);
+        pr_debug("target type %s does not exist\n", t);
         return false;
     }
     cls = symtab_search(&db->p_classes, c);
     if (cls == NULL) {
-        pr_warn("class %s does not exist\n", c);
+        pr_debug("class %s does not exist\n", c);
         return false;
     }
     def = symtab_search(&db->p_types, d);
     if (def == NULL) {
-        pr_warn("default type %s does not exist\n", d);
+        pr_debug("default type %s does not exist\n", d);
         return false;
     }
 
@@ -663,7 +663,7 @@ static bool add_type(struct policydb *db, const char *type_name, bool attr)
 {
     struct type_datum *type = symtab_search(&db->p_types, type_name);
     if (type) {
-        pr_warn("Type %s already exists\n", type_name);
+        pr_debug("Type %s already exists\n", type_name);
         return true;
     }
 
@@ -744,16 +744,16 @@ static bool set_type_state(struct policydb *db, const char *type_name,
         {
             type = (struct type_datum *)(node->datum);
             if (ebitmap_set_bit(&db->permissive_map, type->value, permissive))
-                pr_info("Could not set bit in permissive map\n");
+                pr_debug("Could not set bit in permissive map\n");
         };
     } else {
         type = (struct type_datum *)symtab_search(&db->p_types, type_name);
         if (type == NULL) {
-            pr_info("type %s does not exist\n", type_name);
+            pr_debug("type %s does not exist\n", type_name);
             return false;
         }
         if (ebitmap_set_bit(&db->permissive_map, type->value, permissive)) {
-            pr_info("Could not set bit in permissive map\n");
+            pr_debug("Could not set bit in permissive map\n");
             return false;
         }
     }
@@ -788,19 +788,19 @@ static bool add_typeattribute(struct policydb *db, const char *type,
 {
     struct type_datum *type_d = symtab_search(&db->p_types, type);
     if (type_d == NULL) {
-        pr_info("type %s does not exist\n", type);
+        pr_debug("type %s does not exist\n", type);
         return false;
     } else if (type_d->attribute) {
-        pr_info("type %s is an attribute\n", attr);
+        pr_debug("type %s is an attribute\n", attr);
         return false;
     }
 
     struct type_datum *attr_d = symtab_search(&db->p_types, attr);
     if (attr_d == NULL) {
-        pr_info("attribute %s does not exist\n", type);
+        pr_debug("attribute %s does not exist\n", type);
         return false;
     } else if (!attr_d->attribute) {
-        pr_info("type %s is not an attribute \n", attr);
+        pr_debug("type %s is not an attribute \n", attr);
         return false;
     }
 
@@ -956,16 +956,16 @@ struct selinux_policy *ksu_dup_sepolicy(struct selinux_policy *old_pol)
     static const size_t kConfigOff = 20;
     if (len >= kConfigOff + sizeof(u32)) {
         u32 *config_ptr = (u32 *)((unsigned long)data + kConfigOff);
-        pr_info("old config: %u\n", *config_ptr);
+        pr_debug("old config: %u\n", *config_ptr);
         if (old_pol->policydb.android_netlink_route) {
-            pr_info("adding POLICYDB_CONFIG_ANDROID_NETLINK_ROUTE\n");
+            pr_debug("adding POLICYDB_CONFIG_ANDROID_NETLINK_ROUTE\n");
             *config_ptr |= POLICYDB_CONFIG_ANDROID_NETLINK_ROUTE;
         }
         if (old_pol->policydb.android_netlink_getneigh) {
-            pr_info("adding POLICYDB_CONFIG_ANDROID_NETLINK_GETNEIGH\n");
+            pr_debug("adding POLICYDB_CONFIG_ANDROID_NETLINK_GETNEIGH\n");
             *config_ptr |= POLICYDB_CONFIG_ANDROID_NETLINK_GETNEIGH;
         }
-        pr_info("new config: %u\n", *config_ptr);
+        pr_debug("new config: %u\n", *config_ptr);
     }
 
     new_pol = kmemdup(old_pol, sizeof(*old_pol), GFP_KERNEL);

@@ -75,10 +75,10 @@ void ksu_show_allow_list(void)
 {
     int i;
     struct perm_data *p = NULL;
-    pr_info("ksu_show_allow_list\n");
+    pr_debug("ksu_show_allow_list\n");
     rcu_read_lock();
     hash_for_each_rcu (allow_list, i, p, list) {
-        pr_info("uid :%d, allow: %d\n", p->profile.curr_uid, p->profile.allow_su);
+        pr_debug("uid :%d, allow: %d\n", p->profile.curr_uid, p->profile.allow_su);
     }
     rcu_read_unlock();
 }
@@ -127,7 +127,7 @@ static bool profile_valid(struct app_profile *profile)
 	}
 
 	if (profile->version != KSU_APP_PROFILE_VER) {
-		pr_info("Unsupported profile version: %d\n", profile->version);
+		pr_debug("Unsupported profile version: %d\n", profile->version);
 		return false;
 	}
 
@@ -195,7 +195,7 @@ int ksu_set_app_profile(struct app_profile *profile)
     hash_for_each_possible (allow_list, p, list, profile->curr_uid) {
         if (profile->curr_uid == p->profile.curr_uid) {
             if (strcmp(profile->key, p->profile.key) != 0) {
-                pr_warn("ksu_set_app_profile: key changed: uid=%d orig=%s new=%s\n", profile->curr_uid, p->profile.key,
+                pr_debug("ksu_set_app_profile: key changed: uid=%d orig=%s new=%s\n", profile->curr_uid, p->profile.key,
                         profile->key);
             }
             // found it, just override it all!
@@ -230,11 +230,11 @@ int ksu_set_app_profile(struct app_profile *profile)
     kref_init(&np->ref);
     memcpy(&np->profile, profile, sizeof(*profile));
     if (profile->allow_su) {
-        pr_info("set root profile, key: %s, uid: %d, gid: %d, context: %s\n", profile->key, profile->curr_uid,
+        pr_debug("set root profile, key: %s, uid: %d, gid: %d, context: %s\n", profile->key, profile->curr_uid,
                 profile->rp_config.profile.gid,
                 profile->rp_config.profile.selinux_domain);
     } else {
-        pr_info("set app profile, key: %s, uid: %d, umount modules: %d\n", profile->key, profile->curr_uid,
+        pr_debug("set app profile, key: %s, uid: %d, umount modules: %d\n", profile->key, profile->curr_uid,
                 profile->nrp_config.profile.umount_modules);
     }
 
@@ -396,7 +396,7 @@ bool ksu_get_allow_list(int *array, u16 length, u16 *out_length, u16 *out_total,
     int iter;
     rcu_read_lock();
     hash_for_each_rcu (allow_list, iter, p, list) {
-        // pr_info("get_allow_list uid: %d allow: %d\n", p->uid, p->allow);
+        // pr_debug("get_allow_list uid: %d allow: %d\n", p->uid, p->allow);
         if (p->profile.allow_su == allow && !is_uid_manager(p->profile.curr_uid)) {
             if (j < length) {
                 array[j++] = p->profile.curr_uid;
@@ -445,7 +445,7 @@ static void do_persistent_allow_list(struct callback_head *_cb)
 
     mutex_lock(&allowlist_mutex);
     hash_for_each (allow_list, i, p, list) {
-        pr_info("save allow list, name: %s uid :%d, allow: %d\n", p->profile.key, p->profile.curr_uid,
+        pr_debug("save allow list, name: %s uid :%d, allow: %d\n", p->profile.key, p->profile.curr_uid,
                 p->profile.allow_su);
 
         kernel_write(fp, &p->profile, sizeof(p->profile), &off);
@@ -481,7 +481,7 @@ void ksu_persistent_allow_list()
 	cb->func = do_persistent_allow_list;
 	if (task_work_add(tsk, cb, TWA_RESUME)) {
 		kfree(cb);
-		pr_warn("save_allow_list add task_work failed\n");
+		pr_debug("save_allow_list add task_work failed\n");
 	}
 
 put_task:
@@ -499,7 +499,7 @@ static void migrate_profile(u32 version, struct app_profile *profile)
             domain = profile->rp_config.profile.selinux_domain;
             if (strncmp(domain, "u:r:su:s0", domain_len) == 0) {
                 strscpy_pad(domain, KSU_DEFAULT_SELINUX_DOMAIN, domain_len);
-                pr_info("migrated domain of profile: %s\n", profile->key);
+                pr_debug("migrated domain of profile: %s\n", profile->key);
             }
         }
         fallthrough;
@@ -516,7 +516,7 @@ static void migrate_profile(u32 version, struct app_profile *profile)
 void ksu_load_allow_list()
 {
 #ifdef CONFIG_KSU_DISABLE_POLICY
-	pr_info("allowlist load skipped because policy is disabled\n");
+	pr_debug("allowlist load skipped because policy is disabled\n");
 	return;
 #endif
 
@@ -552,7 +552,7 @@ void ksu_load_allow_list()
 		goto exit;
 	}
 
-	pr_info("allowlist version: %d\n", version);
+	pr_debug("allowlist version: %d\n", version);
 
 	static const size_t kAppProfileSizePreV4 = 776;
 	app_profile_size = version < KSU_APP_PROFILE_VER ? kAppProfileSizePreV4 : sizeof(struct app_profile);
@@ -564,13 +564,13 @@ void ksu_load_allow_list()
 
 		if (ret != app_profile_size) {
 			if (ret != 0)
-				pr_info("load_allow_list read err: %zd\n", ret);
+				pr_debug("load_allow_list read err: %zd\n", ret);
 			break;
 		}
 
 		migrate_profile(version, &profile);
 
-		pr_info("load_allow_uid, name: %s, uid: %d, allow: %d\n", profile.key, profile.curr_uid, profile.allow_su);
+		pr_debug("load_allow_uid, name: %s, uid: %d, allow: %d\n", profile.key, profile.curr_uid, profile.allow_su);
 		ksu_set_app_profile(&profile);
 	}
 	ksu_show_allow_list();
@@ -592,7 +592,7 @@ void ksu_prune_allowlist(bool (*is_uid_valid)(uid_t, char *, void *),
     int i;
 
     if (!ksu_boot_completed) {
-        pr_info("boot not completed, skip prune\n");
+        pr_debug("boot not completed, skip prune\n");
         return;
     }
 
@@ -605,7 +605,7 @@ void ksu_prune_allowlist(bool (*is_uid_valid)(uid_t, char *, void *),
         bool is_preserved_uid = uid == KSU_APP_PROFILE_PRESERVE_UID;
         if (!is_preserved_uid && !is_uid_valid(uid, package, data)) {
             modified = true;
-            pr_info("prune uid: %d, package: %s\n", uid, package);
+            pr_debug("prune uid: %d, package: %s\n", uid, package);
             hlist_del_rcu(&np->list);
             put_perm_data(np);
             --allow_list_count;

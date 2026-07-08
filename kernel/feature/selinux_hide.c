@@ -251,13 +251,13 @@ static void initialize_fake_status()
     if (fake_status)
         goto out;
     if (!selinux_state.status_page) {
-        pr_warn("initialize_fake_status: status_page not exist\n");
+        pr_debug("initialize_fake_status: status_page not exist\n");
         goto out;
     }
 
     struct selinux_kernel_status *status = page_address(selinux_state.status_page);
     if (!status->enforcing && !ksu_late_loaded) {
-        pr_warn("initialize_fake_status: skip not enforcing\n");
+        pr_debug("initialize_fake_status: skip not enforcing\n");
         goto out;
     }
 
@@ -278,7 +278,7 @@ static void initialize_fake_status()
     }
 
     fake_status = new_page;
-    pr_info("initialize_fake_status initialized: sequence=%d, policyload=%d, enforcing=%d\n", new_status->sequence,
+    pr_debug("initialize_fake_status initialized: sequence=%d, policyload=%d, enforcing=%d\n", new_status->sequence,
             new_status->policyload, new_status->enforcing);
 
 out:
@@ -312,7 +312,7 @@ static void ksu_selinux_hide_unhook();
 static int ksu_selinux_hide_enable()
 {
     int ret;
-    pr_info("selinux_hide: init selinux hide\n");
+    pr_debug("selinux_hide: init selinux hide\n");
     if (!backup_sepolicy) {
         pr_err("no backup sepolicy available, please save feature and reboot to retry!\n");
         return -EAGAIN;
@@ -327,11 +327,11 @@ static int ksu_selinux_hide_enable()
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
     security_dump_masked_av_fn = find_kernel_symbol_exact("security_dump_masked_av");
     if (!security_dump_masked_av_fn) {
-        pr_warn("security_dump_masked_av not found!\n");
+        pr_debug("security_dump_masked_av not found!\n");
     }
     context_struct_compute_av_fn = find_kernel_symbol_exact("context_struct_compute_av");
     if (!context_struct_compute_av_fn) {
-        pr_warn("context_struct_compute_av not found!\n");
+        pr_debug("context_struct_compute_av not found!\n");
     }
 #else
     fake_state.initialized = true;
@@ -339,7 +339,7 @@ static int ksu_selinux_hide_enable()
 #endif
 
     context_write = &selinux_write_op[SEL_CONTEXT];
-    pr_info("selinux_hide: context_write: 0x%lx [%pSb]\n", (unsigned long)*context_write, *context_write);
+    pr_debug("selinux_hide: context_write: 0x%lx [%pSb]\n", (unsigned long)*context_write, *context_write);
     write_op_fn my = my_write_context;
     orig_context_write = *context_write;
     ret = ksu_patch_text(context_write, &my, sizeof(my), KSU_PATCH_TEXT_FLUSH_DCACHE);
@@ -349,7 +349,7 @@ static int ksu_selinux_hide_enable()
     }
 
     access_write = &selinux_write_op[SEL_ACCESS];
-    pr_info("selinux_hide: access_write: 0x%lx [%pSb]\n", (unsigned long)*access_write, *access_write);
+    pr_debug("selinux_hide: access_write: 0x%lx [%pSb]\n", (unsigned long)*access_write, *access_write);
     my = my_write_access;
     orig_access_write = *access_write;
     ret = ksu_patch_text(access_write, &my, sizeof(my), KSU_PATCH_TEXT_FLUSH_DCACHE);
@@ -402,7 +402,7 @@ static void ksu_selinux_hide_unhook()
 
 static void ksu_selinux_hide_disable()
 {
-    pr_info("selinux_hide: exit selinux hide\n");
+    pr_debug("selinux_hide: exit selinux hide\n");
     ksu_selinux_hide_unhook();
 }
 
@@ -416,7 +416,7 @@ static int selinux_hide_feature_set(u64 value)
 {
     bool enable = value != 0;
     int ret = 0;
-    pr_info("selinux_hide: set to %d\n", enable);
+    pr_debug("selinux_hide: set to %d\n", enable);
     mutex_lock(&selinux_hide_mutex);
     ksu_selinux_hide_enabled = enable;
     if (enable) {
@@ -450,7 +450,7 @@ void ksu_selinux_hide_handle_second_stage()
     if (fake_status) {
         static_key_disable(&fake_status_initialize_key.key);
     } else {
-        pr_warn("selinux_hide: fake status need late initialization\n");
+        pr_debug("selinux_hide: fake status need late initialization\n");
     }
 }
 
@@ -517,7 +517,7 @@ void ksu_selinux_hide_drop_backup_if_unused()
 {
     mutex_lock(&selinux_hide_mutex);
     if (!ksu_selinux_hide_running && backup_sepolicy) {
-        pr_info("selinux_hide is not enabled - drop backup_sepolicy\n");
+        pr_debug("selinux_hide is not enabled - drop backup_sepolicy\n");
         sidtab_destroy(backup_sepolicy->sidtab);
         kfree(backup_sepolicy->sidtab);
         ksu_destroy_sepolicy(backup_sepolicy);

@@ -55,7 +55,7 @@ static void ksu_mnt_ns_global(void)
     char *pwd_path = NULL;
     char *pwd_buf = kmalloc(PATH_MAX, GFP_KERNEL);
     if (!pwd_buf) {
-        pr_warn("no mem for pwd buffer, skip restore pwd!!\n");
+        pr_debug("no mem for pwd buffer, skip restore pwd!!\n");
         goto try_setns;
     }
 
@@ -66,10 +66,10 @@ static void ksu_mnt_ns_global(void)
 
     if (IS_ERR(pwd_path)) {
         if (PTR_ERR(pwd_path) == -ENAMETOOLONG) {
-            pr_warn("absolute pwd longer than: %d, skip restore pwd!!\n",
+            pr_debug("absolute pwd longer than: %d, skip restore pwd!!\n",
                     PATH_MAX);
         } else {
-            pr_warn("get absolute pwd failed: %ld\n", PTR_ERR(pwd_path));
+            pr_debug("get absolute pwd failed: %ld\n", PTR_ERR(pwd_path));
         }
         pwd_path = NULL;
     }
@@ -82,35 +82,35 @@ try_setns:
     struct pid *pid_struct = find_pid_ns(1, &init_pid_ns);
     if (unlikely(!pid_struct)) {
         rcu_read_unlock();
-        pr_warn("failed to find pid_struct for PID 1\n");
+        pr_debug("failed to find pid_struct for PID 1\n");
         goto out;
     }
 
     struct task_struct *pid1_task = get_pid_task(pid_struct, PIDTYPE_PID);
     rcu_read_unlock();
     if (unlikely(!pid1_task)) {
-        pr_warn("failed to get task_struct for PID 1\n");
+        pr_debug("failed to get task_struct for PID 1\n");
         goto out;
     }
     struct path ns_path;
     long ret = ns_get_path(&ns_path, pid1_task, &mntns_operations);
     put_task_struct(pid1_task);
     if (ret) {
-        pr_warn("failed get path for init mount namespace: %ld\n", ret);
+        pr_debug("failed get path for init mount namespace: %ld\n", ret);
         goto out;
     }
     struct file *ns_file = dentry_open(&ns_path, O_RDONLY, ksu_cred);
 
     path_put(&ns_path);
     if (IS_ERR(ns_file)) {
-        pr_warn("failed open file for init mount namespace: %ld\n",
+        pr_debug("failed open file for init mount namespace: %ld\n",
                 PTR_ERR(ns_file));
         goto out;
     }
 
     int fd = get_unused_fd_flags(O_CLOEXEC);
     if (fd < 0) {
-        pr_warn("failed to get an unused fd: %d\n", fd);
+        pr_debug("failed to get an unused fd: %d\n", fd);
         fput(ns_file);
         goto out;
     }
@@ -121,7 +121,7 @@ try_setns:
     ksu_close_fd(fd);
 
     if (ret) {
-        pr_warn("call setns failed: %ld\n", ret);
+        pr_debug("call setns failed: %ld\n", ret);
         goto out;
     }
     // try to restore working directory using absolute path after setns
@@ -132,7 +132,7 @@ try_setns:
             set_fs_pwd(current->fs, &new_pwd);
             path_put(&new_pwd);
         } else {
-            pr_warn("restore pwd failed: %d, path: %s\n", err, pwd_path);
+            pr_debug("restore pwd failed: %d, path: %s\n", err, pwd_path);
         }
     }
 out:
@@ -144,7 +144,7 @@ static void ksu_mnt_ns_individual(void)
 {
     long ret = ksys_unshare(CLONE_NEWNS);
     if (ret) {
-        pr_warn("call ksys_unshare failed: %ld\n", ret);
+        pr_debug("call ksys_unshare failed: %ld\n", ret);
         return;
     }
 
@@ -168,7 +168,7 @@ void setup_mount_ns(int32_t ns_mode)
     }
 
     if (ns_mode != KSU_NS_GLOBAL && ns_mode != KSU_NS_INDIVIDUAL) {
-        pr_warn("pid: %d ,unknown mount namespace mode: %d\n", current->pid,
+        pr_debug("pid: %d ,unknown mount namespace mode: %d\n", current->pid,
                 ns_mode);
         return;
     }

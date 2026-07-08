@@ -70,7 +70,7 @@ unsigned long __nocfi find_kernel_symbol_exact(const char *symbol_name)
     // check if it is kernel symbol
     kallsyms_lookup(addr, NULL, NULL, &module_name, buf);
     if (unlikely(module_name)) {
-        pr_warn("ignore symbol %s of module %s\n", symbol_name, module_name);
+        pr_debug("ignore symbol %s of module %s\n", symbol_name, module_name);
         return 0;
     }
     return addr;
@@ -104,14 +104,14 @@ static int lookup_symbol_variant_cb(void *data, const char *name, struct module 
 #if !USE_KCFI
     if (ksu_symbol_has_suffix(name, name_len, cfi_suffix, cfi_suffix_len)) {
         ctx->match = (void *)addr;
-        pr_info("use .cfi_jt variant: %s\n", name);
+        pr_debug("use .cfi_jt variant: %s\n", name);
         return 1;
     }
 #endif
 
     if (!ctx->match) {
         ctx->match = (void *)addr;
-        pr_info("found variant: %s\n", name);
+        pr_debug("found variant: %s\n", name);
 #if USE_KCFI
         return 1;
 #endif
@@ -177,13 +177,13 @@ void __init ksu_init_symbol_resolver()
 #if !ALWAYS_HAVE_ON_EACH_SYMBOL
     kallsyms_on_each_symbol_fn = find_kernel_symbol_exact("kallsyms_on_each_symbol");
     if (!kallsyms_on_each_symbol_fn) {
-        pr_warn("kallsyms_on_each_symbol not found!\n");
+        pr_debug("kallsyms_on_each_symbol not found!\n");
     }
 #endif
 #if HAVE_ON_EACH_MATCH_SYMBOL
     kallsyms_on_each_match_symbol_fn = find_kernel_symbol_exact("kallsyms_on_each_match_symbol");
     if (!kallsyms_on_each_match_symbol_fn) {
-        pr_warn("kallsyms_on_each_match_symbol not found!\n");
+        pr_debug("kallsyms_on_each_match_symbol not found!\n");
     }
 #endif
 }

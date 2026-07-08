@@ -28,13 +28,13 @@ int __init ksu_register_feature_handler(const struct ksu_feature_handler *handle
 	mutex_lock(&feature_mutex);
 
 	if (feature_handlers[handler->feature_id]) {
-		pr_warn("feature: handler for %u already registered, overwriting\n",
+		pr_debug("feature: handler for %u already registered, overwriting\n",
 		handler->feature_id);
 	}
 
 	feature_handlers[handler->feature_id] = handler;
 
-	pr_info("feature: registered handler for %s (id=%u)\n",
+	pr_debug("feature: registered handler for %s (id=%u)\n",
 		handler->name ? handler->name : "unknown", handler->feature_id);
 
 	mutex_unlock(&feature_mutex);
@@ -53,14 +53,14 @@ int ksu_unregister_feature_handler(u32 feature_id)
 	mutex_lock(&feature_mutex);
 
 	if (!feature_handlers[feature_id]) {
-		pr_warn("feature: no handler registered for %u\n", feature_id);
+		pr_debug("feature: no handler registered for %u\n", feature_id);
 		ret = -ENOENT;
 		goto out;
 	}
 
 	feature_handlers[feature_id] = NULL;
 
-	pr_info("feature: unregistered handler for id=%u\n", feature_id);
+	pr_debug("feature: unregistered handler for id=%u\n", feature_id);
 
 out:
 	mutex_unlock(&feature_mutex);
@@ -96,7 +96,7 @@ int ksu_get_feature(u32 feature_id, u64 *value, bool *supported)
 	*supported = true;
 
 	if (!handler->get_handler) {
-		pr_warn("feature: no get_handler for feature %u\n", feature_id);
+		pr_debug("feature: no get_handler for feature %u\n", feature_id);
 		ret = -EOPNOTSUPP;
 		goto out;
 	}
@@ -132,7 +132,7 @@ int ksu_set_feature(u32 feature_id, u64 value)
 	}
 
 	if (!handler->set_handler) {
-		pr_warn("feature: no set_handler for feature %u\n", feature_id);
+		pr_debug("feature: no set_handler for feature %u\n", feature_id);
 		ret = -EOPNOTSUPP;
 		goto out;
 	}
@@ -155,7 +155,7 @@ void __init ksu_feature_init(void)
 		feature_handlers[i] = NULL;
 	}
 
-	pr_info("feature: feature management initialized\n");
+	pr_debug("feature: feature management initialized\n");
 }
 
 void __exit ksu_feature_exit(void)
@@ -170,5 +170,5 @@ void __exit ksu_feature_exit(void)
 
 	mutex_unlock(&feature_mutex);
 
-	pr_info("feature: feature management cleaned up\n");
+	pr_debug("feature: feature management cleaned up\n");
 }

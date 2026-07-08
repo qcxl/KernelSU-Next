@@ -33,7 +33,7 @@ static long is_exec_adbd(struct pt_regs *regs)
 
     ret = strncpy_from_user(buf, fn, sizeof(buf));
     if (ret < 0) {
-        pr_warn("Access filename when adb_root_handle_execve failed: %ld\n", ret);
+        pr_debug("Access filename when adb_root_handle_execve failed: %ld\n", ret);
         return ret;
     }
 
@@ -83,14 +83,14 @@ static long setup_ld_preload(struct pt_regs *regs)
     ld_preload_p = stackp = ALIGN_DOWN(stackp - sizeof(kLdPreload), 8);
     ret = copy_to_user(ld_preload_p, kLdPreload, sizeof(kLdPreload));
     if (ret != 0) {
-        pr_warn("write ld_preload when adb_root_handle_execve failed: %ld\n", ret);
+        pr_debug("write ld_preload when adb_root_handle_execve failed: %ld\n", ret);
         return -EFAULT;
     }
 
     ld_library_path_p = stackp = ALIGN_DOWN(stackp - sizeof(kLdLibraryPath), 8);
     ret = copy_to_user(ld_library_path_p, kLdLibraryPath, sizeof(kLdLibraryPath));
     if (ret != 0) {
-        pr_warn("write ld_library_path when adb_root_handle_execve failed: %ld\n", ret);
+        pr_debug("write ld_library_path when adb_root_handle_execve failed: %ld\n", ret);
         return -EFAULT;
     }
 
@@ -104,7 +104,7 @@ static long setup_ld_preload(struct pt_regs *regs)
         tmp_env_p = tmp_env_p2;
         ret = copy_from_user(&tmp_env_p[env_count], envp + env_count * kPtrSize, kReadEnvBatch * kPtrSize);
         if (ret < 0) {
-            pr_warn("Access envp when adb_root_handle_execve failed: %ld\n", ret);
+            pr_debug("Access envp when adb_root_handle_execve failed: %ld\n", ret);
             ret = -EFAULT;
             goto out_release_env_p;
         }
@@ -174,7 +174,7 @@ static long do_ksu_adb_root_handle_execve(struct pt_regs *regs)
         return ret;
     }
 
-    pr_info("escape to root for adb\n");
+    pr_debug("escape to root for adb\n");
     escape_to_root_for_adb_root();
     return 0;
 }
@@ -201,7 +201,7 @@ static int kernel_adb_root_feature_set(u64 value)
     } else {
         static_key_disable(&ksu_adb_root.key);
     }
-    pr_info("adb_root: set to %d\n", enable);
+    pr_debug("adb_root: set to %d\n", enable);
     return 0;
 }
 

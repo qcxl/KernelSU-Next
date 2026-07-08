@@ -48,7 +48,7 @@ void apply_kernelsu_rules()
     struct policydb *db;
 
     if (!getenforce()) {
-        pr_info("SELinux permissive or disabled, apply rules!\n");
+        pr_debug("SELinux permissive or disabled, apply rules!\n");
     }
 
     mutex_lock(&selinux_state.policy_mutex);
@@ -71,7 +71,7 @@ void apply_kernelsu_rules()
                 ksu_destroy_sepolicy(backup_sepolicy);
                 backup_sepolicy = NULL;
             } else {
-                pr_info("backup sepolicy success! latest_granting=%d\n", backup_sepolicy->latest_granting);
+                pr_debug("backup sepolicy success! latest_granting=%d\n", backup_sepolicy->latest_granting);
             }
         }
     }
@@ -466,7 +466,7 @@ int handle_sepolicy(void __user *user_data, u64 data_len)
     }
 
     if (!getenforce()) {
-        pr_info("SELinux permissive or disabled when handle policy!\n");
+        pr_debug("SELinux permissive or disabled when handle policy!\n");
     }
 
     mutex_lock(&selinux_state.policy_mutex);
