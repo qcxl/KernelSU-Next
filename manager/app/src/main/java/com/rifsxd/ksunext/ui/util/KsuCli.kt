@@ -194,17 +194,15 @@ fun getSelinuxEnforce(): Boolean? {
 }
 
 fun setSelinuxEnforce(enforce: Boolean): Boolean {
-    // First attempt: use setenforce command with a fresh root shell
-    val fromCommand = runCatching {
-        val valStr = if (enforce) "1" else "0"
-        withNewRootShell {
-            ShellUtils.fastCmdResult(this, "setenforce $valStr")
-        }
+    val valStr = if (enforce) "1" else "0"
+
+    // First attempt: use setenforce via the default root shell (libsu)
+    val fromShell = runCatching {
+        ShellUtils.fastCmdResult("setenforce $valStr")
     }.getOrDefault(false)
+    if (fromShell) return true
 
-    if (fromCommand) return true
-
-    // Fallback: write directly to /sys/fs/selinux/enforce via SuFile (root-aware)
+    // Second attempt: write directly to /sys/fs/selinux/enforce via SuFile
     return runCatching {
         val valBytes = if (enforce) "1".toByteArray() else "0".toByteArray()
         SuFile("/sys/fs/selinux/enforce").run {

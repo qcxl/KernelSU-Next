@@ -317,6 +317,29 @@ void track_throne(bool prune_only)
 	struct uid_data *np;
 	struct uid_data *n;
 
+#ifdef KSU_MANAGER_PACKAGE
+	/* Auto-crown manager by package name from uid_list (already parsed).
+	 * This runs before prune_only check, so on_boot_completed's
+	 * track_throne(true) can still register the manager.
+	 * Pure memory traversal - no VFS access, SUSFS-safe.
+	 */
+	{
+		struct uid_data *manager_entry = NULL;
+		list_for_each_entry(np, &uid_list, list) {
+			if (strcmp(np->package, KSU_MANAGER_PACKAGE) == 0) {
+				manager_entry = np;
+				break;
+			}
+		}
+		if (manager_entry) {
+			if (!ksu_is_manager_appid_valid() ||
+			    ksu_get_manager_appid() != manager_entry->uid) {
+				ksu_set_manager_appid(manager_entry->uid);
+			}
+		}
+	}
+#endif
+
 	if (prune_only)
 		goto prune;
 
