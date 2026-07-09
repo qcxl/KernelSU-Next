@@ -216,15 +216,10 @@ fun setSelinuxEnforce(enforce: Boolean): Boolean {
     }.getOrDefault(false)
     if (fromFile) return true
 
-    // Third attempt: use KSU kernel setenforce via IOCTL feature handler.
-    // With the SEL_ENFORCE write_op hook, shell setenforce should work,
-    // but this is a fallback if it doesn't.
-    if (!enforce) {
-        return Natives.setSelinuxHideEnabled(true) == 0
-    }
-    // For enforcing: kernel setenforce(true) is now safe because
-    // the SEL_ENFORCE hook + kept setprocattr hook prevent crashes.
-    return Natives.setSelinuxHideEnabled(false) == 0
+    // SELinux mode can only be changed via standard setenforce command.
+    // If both shell and direct file write fail, report failure.
+    // Do NOT fall back to kernel hook (which would permanently downgrade SELinux).
+    return false
 }
 
 private fun processUiPrintLine(s: String?): Pair<Int, String?> {
