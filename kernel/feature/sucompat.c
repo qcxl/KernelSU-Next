@@ -158,10 +158,12 @@ do_orig_stat:
 	return ksu_syscall_table[orig_nr](regs);
 }
 
-long ksu_handle_execve_sucompat(const char __user **filename_user, int orig_nr, struct pt_regs *regs)
+long ksu_handle_execve_sucompat(const char __user **filename_user, int orig_nr,
+				struct pt_regs *regs)
 {
 	const char __user *fn;
-	const char __user *const __user *argv_user = (const char __user *const __user *)PT_REGS_PARM2(regs);
+	const char __user *const __user *argv_user =
+		(const char __user *const __user *)PT_REGS_PARM2(regs);
 	struct ksu_sulog_pending_event *pending_sucompat = NULL;
 	char path[sizeof(su_path) + 1];
 	long ret, orig_regs[5];
@@ -209,7 +211,8 @@ long ksu_handle_execve_sucompat(const char __user **filename_user, int orig_nr, 
 
 	fd_install(tmp_fd, ksud_file);
 
-	pending_sucompat = ksu_sulog_capture_sucompat(*filename_user, argv_user, GFP_KERNEL);
+	pending_sucompat = ksu_sulog_capture_sucompat(*filename_user, argv_user,
+						      GFP_KERNEL);
 	// execve(file, argv, environ)
 	// execveat(fd, file, argv, environ, flags)
 	orig_regs[0] = regs->__PT_PARM1_REG;

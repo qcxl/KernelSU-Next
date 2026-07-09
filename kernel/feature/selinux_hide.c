@@ -37,9 +37,9 @@
 
 /* ============= 常量 ============= */
 
-#define KSU_DOMAIN_TAG   ":ksu:"
-#define KSU_DOMAIN_TAG2  ":ksu_"
-#define KSU_DOMAIN_FULL  "u:r:ksu:s0"
+#define KSU_DOMAIN_TAG ":ksu:"
+#define KSU_DOMAIN_TAG2 ":ksu_"
+#define KSU_DOMAIN_FULL "u:r:ksu:s0"
 
 #ifndef SIMPLE_TRANSACTION_LIMIT
 #define SIMPLE_TRANSACTION_LIMIT (PAGE_SIZE - sizeof(ssize_t))
@@ -77,7 +77,8 @@ typedef ssize_t (*write_op_fn)(struct file *file, char *buf, size_t size);
 typedef int (*setprocattr_fn)(const char *name, void *value, size_t size);
 
 static int __nocfi my_setprocattr(const char *name, void *value, size_t size);
-struct ksu_lsm_hook selinux_setprocattr_hook = KSU_LSM_HOOK_INIT(setprocattr, "selinux_setprocattr", my_setprocattr, 0);
+struct ksu_lsm_hook selinux_setprocattr_hook = KSU_LSM_HOOK_INIT(
+	setprocattr, "selinux_setprocattr", my_setprocattr, 0);
 
 /* ============= 全局状态 ============= */
 
@@ -115,8 +116,7 @@ static bool buf_mentions_ksu(const char *buf, size_t size)
 
 static ssize_t my_write_context(struct file *file, char *buf, size_t size)
 {
-	if (likely(current_uid().val >= 10000 &&
-		   ksu_selinux_hide_enabled &&
+	if (likely(current_uid().val >= 10000 && ksu_selinux_hide_enabled &&
 		   ksu_selinux_hide_running &&
 		   current_uid().val != ksu_get_manager_appid())) {
 		if (buf_mentions_ksu(buf, size))
@@ -129,14 +129,13 @@ static ssize_t my_write_context(struct file *file, char *buf, size_t size)
 
 static ssize_t my_write_access(struct file *file, char *buf, size_t size)
 {
-	if (likely(current_uid().val >= 10000 &&
-		   ksu_selinux_hide_enabled &&
+	if (likely(current_uid().val >= 10000 && ksu_selinux_hide_enabled &&
 		   ksu_selinux_hide_running &&
 		   current_uid().val != ksu_get_manager_appid())) {
 		if (buf_mentions_ksu(buf, size)) {
 			return scnprintf(buf, SIMPLE_TRANSACTION_LIMIT,
-					 "%x %x %x %x %u %x",
-					 0, 0xffffffff, 0, 0xffffffff, 0, 0);
+					 "%x %x %x %x %u %x", 0, 0xffffffff, 0,
+					 0xffffffff, 0, 0);
 		}
 	}
 	return orig_access_write(file, buf, size);
@@ -146,16 +145,17 @@ static ssize_t my_write_access(struct file *file, char *buf, size_t size)
 
 static int __nocfi my_setprocattr(const char *name, void *value, size_t size)
 {
-	if (ksu_selinux_hide_enabled &&
-	    ksu_selinux_hide_running &&
+	if (ksu_selinux_hide_enabled && ksu_selinux_hide_running &&
 	    current_uid().val >= 10000 &&
 	    current_uid().val != ksu_get_manager_appid()) {
 		if (name && !strcmp(name, "current")) {
-			if (value && buf_mentions_ksu((const char *)value, size))
+			if (value &&
+			    buf_mentions_ksu((const char *)value, size))
 				return -EACCES;
 		}
 	}
-	return ((setprocattr_fn)selinux_setprocattr_hook.original)(name, value, size);
+	return ((setprocattr_fn)selinux_setprocattr_hook.original)(name, value,
+								   size);
 }
 
 /* ============= hook / unhook 安装 ============= */
@@ -356,11 +356,13 @@ void __init ksu_selinux_hide_init(void)
 
 	ret = ksu_register_feature_handler(&selinux_hide_handler);
 	if (ret)
-		pr_err("selinux_hide: failed to register feature handler: %d\n", ret);
+		pr_err("selinux_hide: failed to register feature handler: %d\n",
+		       ret);
 
 	ret = ksu_register_feature_handler(&enforce_handler);
 	if (ret)
-		pr_err("selinux_hide: failed to register enforce handler: %d\n", ret);
+		pr_err("selinux_hide: failed to register enforce handler: %d\n",
+		       ret);
 
 	pr_info("selinux_hide: initialized (toggle to activate)\n");
 }

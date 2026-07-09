@@ -4,7 +4,7 @@
 #ifdef CONFIG_KSU_DISABLE_MANAGER
 static inline int ksu_observer_init(void)
 {
-    return 0;
+	return 0;
 }
 
 static inline void ksu_observer_exit(void)

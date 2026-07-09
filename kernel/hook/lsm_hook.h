@@ -12,31 +12,33 @@
 #endif
 
 struct ksu_lsm_hook {
-    const char *head_name;
-    const char *target_name;
-    size_t head_offset;
-    size_t hook_offset;
-    void *replacement;
-    void *original;
-    struct security_hook_list *entry;
+	const char *head_name;
+	const char *target_name;
+	size_t head_offset;
+	size_t hook_offset;
+	void *replacement;
+	void *original;
+	struct security_hook_list *entry;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
-    struct lsm_static_call *scall;
+	struct lsm_static_call *scall;
 #else
-    struct security_hook_list list;
+	struct security_hook_list list;
 #endif
-    // the offset from target_name to the real hook target
-    // for example, we'd like to hook task_free, but no target_name can be found
-    // (because none of lsm hook it), then we can find task_alloc and set offset
-    // to 1
-    int offset;
+	// the offset from target_name to the real hook target
+	// for example, we'd like to hook task_free, but no target_name can be found
+	// (because none of lsm hook it), then we can find task_alloc and set offset
+	// to 1
+	int offset;
 };
 
-#define KSU_LSM_HOOK_INIT(member, target_symbol, replacement_fn, off)                                                  \
-    {                                                                                                                  \
-        .head_name = #member, .target_name = target_symbol, .head_offset = offsetof(KSU_LSM_HOOK_HEADS_TYPE, member),  \
-        .hook_offset = offsetof(struct security_hook_list, hook.member), .replacement = (void *)(replacement_fn),      \
-        .offset = off,                                                                                                 \
-    }
+#define KSU_LSM_HOOK_INIT(member, target_symbol, replacement_fn, off)          \
+	{                                                                      \
+		.head_name = #member, .target_name = target_symbol,            \
+		.head_offset = offsetof(KSU_LSM_HOOK_HEADS_TYPE, member),      \
+		.hook_offset =                                                 \
+			offsetof(struct security_hook_list, hook.member),      \
+		.replacement = (void *)(replacement_fn), .offset = off,        \
+	}
 
 // This API implements runtime patching of existing LSM hook slots. It is a
 // workaround for out-of-tree modules, not the normal LSM registration path via

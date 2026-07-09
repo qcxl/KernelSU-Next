@@ -7,7 +7,8 @@ static const struct ksu_feature_handler *feature_handlers[KSU_FEATURE_MAX];
 
 static DEFINE_MUTEX(feature_mutex);
 
-int __init ksu_register_feature_handler(const struct ksu_feature_handler *handler)
+int __init
+ksu_register_feature_handler(const struct ksu_feature_handler *handler)
 {
 	if (!handler) {
 		pr_err("feature: register handler is NULL\n");
@@ -19,23 +20,25 @@ int __init ksu_register_feature_handler(const struct ksu_feature_handler *handle
 		return -EINVAL;
 	}
 
-    if (!handler->get_handler && !handler->set_handler) {
-        pr_err("feature: no handler provided for feature %u\n",
-               handler->feature_id);
-        return -EINVAL;
-    }
+	if (!handler->get_handler && !handler->set_handler) {
+		pr_err("feature: no handler provided for feature %u\n",
+		       handler->feature_id);
+		return -EINVAL;
+	}
 
 	mutex_lock(&feature_mutex);
 
 	if (feature_handlers[handler->feature_id]) {
-		pr_debug("feature: handler for %u already registered, overwriting\n",
-		handler->feature_id);
+		pr_debug(
+			"feature: handler for %u already registered, overwriting\n",
+			handler->feature_id);
 	}
 
 	feature_handlers[handler->feature_id] = handler;
 
 	pr_debug("feature: registered handler for %s (id=%u)\n",
-		handler->name ? handler->name : "unknown", handler->feature_id);
+		 handler->name ? handler->name : "unknown",
+		 handler->feature_id);
 
 	mutex_unlock(&feature_mutex);
 	return 0;
@@ -96,14 +99,16 @@ int ksu_get_feature(u32 feature_id, u64 *value, bool *supported)
 	*supported = true;
 
 	if (!handler->get_handler) {
-		pr_debug("feature: no get_handler for feature %u\n", feature_id);
+		pr_debug("feature: no get_handler for feature %u\n",
+			 feature_id);
 		ret = -EOPNOTSUPP;
 		goto out;
 	}
 
 	ret = handler->get_handler(value);
 	if (ret) {
-		pr_err("feature: get_handler for %u failed: %d\n", feature_id, ret);
+		pr_err("feature: get_handler for %u failed: %d\n", feature_id,
+		       ret);
 	}
 
 out:
@@ -132,14 +137,16 @@ int ksu_set_feature(u32 feature_id, u64 value)
 	}
 
 	if (!handler->set_handler) {
-		pr_debug("feature: no set_handler for feature %u\n", feature_id);
+		pr_debug("feature: no set_handler for feature %u\n",
+			 feature_id);
 		ret = -EOPNOTSUPP;
 		goto out;
 	}
 
 	ret = handler->set_handler(value);
 	if (ret) {
-		pr_err("feature: set_handler for %u failed: %d\n", feature_id, ret);
+		pr_err("feature: set_handler for %u failed: %d\n", feature_id,
+		       ret);
 	}
 
 out:

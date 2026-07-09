@@ -104,7 +104,8 @@ int ksu_handle_umount(uid_t old_uid, uid_t new_uid)
 	// also handle case 4 and 5
 	bool is_zygote_child = is_zygote(current_cred());
 	if (!is_zygote_child) {
-		pr_debug("handle umount ignore non zygote child: %d\n", current->pid);
+		pr_debug("handle umount ignore non zygote child: %d\n",
+			 current->pid);
 		return 0;
 	}
 	// umount the target mnt
@@ -115,7 +116,8 @@ int ksu_handle_umount(uid_t old_uid, uid_t new_uid)
 	struct mount_entry *entry;
 	down_read(&mount_list_lock);
 	list_for_each_entry (entry, &mount_list, list) {
-		pr_debug("%s: unmounting: %s flags: 0x%x\n", __func__, entry->umountable, entry->flags);
+		pr_debug("%s: unmounting: %s flags: 0x%x\n", __func__,
+			 entry->umountable, entry->flags);
 		try_umount(entry->umountable, entry->flags);
 	}
 	up_read(&mount_list_lock);

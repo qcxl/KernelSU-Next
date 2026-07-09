@@ -41,30 +41,30 @@
 // while those third-party kernel can't provide.
 // Thus, we manually provide it instead of using kernel's
 #if defined(CONFIG_STACKPROTECTOR) &&                                          \
-    (defined(CONFIG_ARM64) && defined(MODULE) &&                               \
-     !defined(CONFIG_STACKPROTECTOR_PER_TASK))
+	(defined(CONFIG_ARM64) && defined(MODULE) &&                           \
+	 !defined(CONFIG_STACKPROTECTOR_PER_TASK))
 #include <linux/stackprotector.h>
 #include <linux/random.h>
 unsigned long __stack_chk_guard __ro_after_init
-    __attribute__((visibility("hidden")));
+	__attribute__((visibility("hidden")));
 
 __attribute__((no_stack_protector)) void __init ksu_setup_stack_chk_guard()
 {
-    unsigned long canary;
+	unsigned long canary;
 
-    /* Try to get a semi random initial value. */
-    get_random_bytes(&canary, sizeof(canary));
-    canary ^= LINUX_VERSION_CODE;
-    canary &= CANARY_MASK;
-    __stack_chk_guard = canary;
+	/* Try to get a semi random initial value. */
+	get_random_bytes(&canary, sizeof(canary));
+	canary ^= LINUX_VERSION_CODE;
+	canary &= CANARY_MASK;
+	__stack_chk_guard = canary;
 }
 
 __attribute__((naked)) int __init kernelsu_init_early(void)
 {
-    asm("mov x19, x30;\n"
-        "bl ksu_setup_stack_chk_guard;\n"
-        "mov x30, x19;\n"
-        "b kernelsu_init;\n");
+	asm("mov x19, x30;\n"
+	    "bl ksu_setup_stack_chk_guard;\n"
+	    "mov x30, x19;\n"
+	    "b kernelsu_init;\n");
 }
 #define NEED_OWN_STACKPROTECTOR 1
 #else
@@ -87,19 +87,28 @@ module_param_named(norc, ksu_no_custom_rc, bool, 0);
 int __init kernelsu_init(void)
 {
 #if defined(__x86_64__)
-    // If the kernel has the hardening patch, X86_FEATURE_INDIRECT_SAFE must be set 
-    if (!boot_cpu_has(X86_FEATURE_INDIRECT_SAFE)) {
-        pr_alert("*************************************************************");
-        pr_alert("**     NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE    **");
-        pr_alert("**                                                         **");
-        pr_alert("**        X86_FEATURE_INDIRECT_SAFE is not enabled!        **");
-        pr_alert("**      KernelSU will abort initialization to prevent      **");
-        pr_alert("**                     kernel panic.                       **");
-        pr_alert("**                                                         **");
-        pr_alert("**     NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE    **");
-        pr_alert("*************************************************************");
-        return -ENOSYS;
-    }
+	// If the kernel has the hardening patch, X86_FEATURE_INDIRECT_SAFE must be set
+	if (!boot_cpu_has(X86_FEATURE_INDIRECT_SAFE)) {
+		pr_alert(
+			"*************************************************************");
+		pr_alert(
+			"**     NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE    **");
+		pr_alert(
+			"**                                                         **");
+		pr_alert(
+			"**        X86_FEATURE_INDIRECT_SAFE is not enabled!        **");
+		pr_alert(
+			"**      KernelSU will abort initialization to prevent      **");
+		pr_alert(
+			"**                     kernel panic.                       **");
+		pr_alert(
+			"**                                                         **");
+		pr_alert(
+			"**     NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE    **");
+		pr_alert(
+			"*************************************************************");
+		return -ENOSYS;
+	}
 #endif
 
 #ifdef MODULE
@@ -109,13 +118,20 @@ int __init kernelsu_init(void)
 #endif
 
 #ifdef CONFIG_KSU_DEBUG
-	pr_alert("*************************************************************");
-	pr_alert("**     NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE    **");
-	pr_alert("**                                                         **");
-	pr_alert("**         You are running KernelSU in DEBUG mode          **");
-	pr_alert("**                                                         **");
-	pr_alert("**     NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE    **");
-	pr_alert("*************************************************************");
+	pr_alert(
+		"*************************************************************");
+	pr_alert(
+		"**     NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE    **");
+	pr_alert(
+		"**                                                         **");
+	pr_alert(
+		"**         You are running KernelSU in DEBUG mode          **");
+	pr_alert(
+		"**                                                         **");
+	pr_alert(
+		"**     NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE    **");
+	pr_alert(
+		"*************************************************************");
 #endif
 	if (allow_shell) {
 		pr_alert("shell is allowed at init!");

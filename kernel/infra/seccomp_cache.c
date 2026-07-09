@@ -32,34 +32,34 @@ struct seccomp_filter {
 
 void ksu_seccomp_clear_cache(struct seccomp_filter *filter, int nr)
 {
-    if (!filter) {
-        return;
-    }
+	if (!filter) {
+		return;
+	}
 
-    if (nr >= 0 && nr < SECCOMP_ARCH_NATIVE_NR) {
-        clear_bit(nr, filter->cache.allow_native);
-    }
+	if (nr >= 0 && nr < SECCOMP_ARCH_NATIVE_NR) {
+		clear_bit(nr, filter->cache.allow_native);
+	}
 
 #ifdef SECCOMP_ARCH_COMPAT
-    if (nr >= 0 && nr < SECCOMP_ARCH_COMPAT_NR) {
-        clear_bit(nr, filter->cache.allow_compat);
-    }
+	if (nr >= 0 && nr < SECCOMP_ARCH_COMPAT_NR) {
+		clear_bit(nr, filter->cache.allow_compat);
+	}
 #endif
 }
 
 void ksu_seccomp_allow_cache(struct seccomp_filter *filter, int nr)
 {
-    if (!filter) {
-        return;
-    }
+	if (!filter) {
+		return;
+	}
 
-    if (nr >= 0 && nr < SECCOMP_ARCH_NATIVE_NR) {
-        set_bit(nr, filter->cache.allow_native);
-    }
+	if (nr >= 0 && nr < SECCOMP_ARCH_NATIVE_NR) {
+		set_bit(nr, filter->cache.allow_native);
+	}
 
 #ifdef SECCOMP_ARCH_COMPAT
-    if (nr >= 0 && nr < SECCOMP_ARCH_COMPAT_NR) {
-        set_bit(nr, filter->cache.allow_compat);
-    }
+	if (nr >= 0 && nr < SECCOMP_ARCH_COMPAT_NR) {
+		set_bit(nr, filter->cache.allow_compat);
+	}
 #endif
 }

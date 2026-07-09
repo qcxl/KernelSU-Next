@@ -65,14 +65,17 @@ static const struct ksu_feature_handler avc_spoof_handler = {
 static int get_sid()
 {
 	// dont load at all if we cant get sids
-	int err = security_secctx_to_secid("u:r:su:s0", strlen("u:r:su:s0"), &su_sid);
+	int err = security_secctx_to_secid("u:r:su:s0", strlen("u:r:su:s0"),
+					   &su_sid);
 	if (err) {
 		pr_debug("avc_spoof/get_sid: su_sid not found!\n");
 		return -1;
 	}
 	pr_debug("avc_spoof/get_sid: su_sid: %u\n", su_sid);
 
-	err = security_secctx_to_secid("u:r:priv_app:s0:c512,c768", strlen("u:r:priv_app:s0:c512,c768"), &priv_app_sid);
+	err = security_secctx_to_secid("u:r:priv_app:s0:c512,c768",
+				       strlen("u:r:priv_app:s0:c512,c768"),
+				       &priv_app_sid);
 	if (err) {
 		pr_debug("avc_spoof/get_sid: priv_app_sid not found!\n");
 		return -1;
@@ -89,7 +92,9 @@ int ksu_handle_slow_avc_audit(u32 *tsid)
 	// if tsid is su, we just replace it
 	// unsure if its enough, but this is how it is aye?
 	if (*tsid == su_sid) {
-		pr_debug("avc_spoof/slow_avc_audit: replacing su_sid: %u with priv_app_sid: %u\n", su_sid, priv_app_sid);
+		pr_debug(
+			"avc_spoof/slow_avc_audit: replacing su_sid: %u with priv_app_sid: %u\n",
+			su_sid, priv_app_sid);
 		*tsid = priv_app_sid;
 	}
 
@@ -108,7 +113,7 @@ static int slow_avc_audit_pre_handler(struct kprobe *p, struct pt_regs *regs)
 	if (atomic_read(&disable_spoof))
 		return 0;
 
-	/* 
+		/* 
 	 * for < 4.17 int slow_avc_audit(u32 ssid, u32 tsid
 	 * for >= 4.17 int slow_avc_audit(struct selinux_state *state, u32 ssid, u32 tsid
 	 * for >= 6.4 int slow_avc_audit(u32 ssid, u32 tsid
@@ -170,7 +175,7 @@ void ksu_avc_spoof_disable(void)
 	pr_debug("avc_spoof/exit: slow_avc_audit spoofing disabled!\n");
 }
 
-void ksu_avc_spoof_enable(void) 
+void ksu_avc_spoof_enable(void)
 {
 	int ret = get_sid();
 	if (ret) {
@@ -180,19 +185,20 @@ void ksu_avc_spoof_enable(void)
 
 #ifdef CONFIG_KPROBES
 	pr_debug("avc_spoof/init: register slow_avc_audit kprobe!\n");
-	slow_avc_audit_kp = init_kprobe("slow_avc_audit", slow_avc_audit_pre_handler);
-#endif	
+	slow_avc_audit_kp =
+		init_kprobe("slow_avc_audit", slow_avc_audit_pre_handler);
+#endif
 	// once we get the sids, we can now enable the hook handler
 	atomic_set(&disable_spoof, 0);
-	
+
 	pr_debug("avc_spoof/init: slow_avc_audit spoofing enabled!\n");
 }
 
 void ksu_avc_spoof_late_init(void)
 {
 	boot_completed = true;
-	
-    if (ksu_avc_spoof_enabled) {
+
+	if (ksu_avc_spoof_enabled) {
 		ksu_avc_spoof_enable();
 	}
 }

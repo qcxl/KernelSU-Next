@@ -38,7 +38,8 @@ static void crown_manager(const char *apk, struct list_head *uid_data)
 
 	list_for_each_entry (np, list, list) {
 		if (strncmp(np->package, pkg, KSU_MAX_PACKAGE_NAME) == 0) {
-			pr_debug("Crowning manager: %s(uid=%d)\n", pkg, np->uid);
+			pr_debug("Crowning manager: %s(uid=%d)\n", pkg,
+				 np->uid);
 			ksu_set_manager_appid(np->uid);
 			break;
 		}
@@ -82,8 +83,8 @@ struct my_dir_context {
 #endif
 extern bool is_manager_apk(char *path);
 FILLDIR_RETURN_TYPE my_actor(struct dir_context *ctx, const char *name,
-							int namelen, loff_t off, u64 ino,
-							unsigned int d_type)
+			     int namelen, loff_t off, u64 ino,
+			     unsigned int d_type)
 {
 	struct my_dir_context *my_ctx =
 		container_of(ctx, struct my_dir_context, ctx);
@@ -102,20 +103,22 @@ FILLDIR_RETURN_TYPE my_actor(struct dir_context *ctx, const char *name,
 		return FILLDIR_ACTOR_CONTINUE; // Skip "." and ".."
 
 	if (d_type == DT_DIR && namelen >= 8 && !strncmp(name, "vmdl", 4) &&
-		!strncmp(name + namelen - 4, ".tmp", 4)) {
+	    !strncmp(name + namelen - 4, ".tmp", 4)) {
 		pr_debug("Skipping directory: %.*s\n", namelen, name);
 		return FILLDIR_ACTOR_CONTINUE; // Skip staging package
 	}
 
-	if (snprintf(dirpath, DATA_PATH_LEN, "%s/%.*s", my_ctx->parent_dir, namelen,
-				name) >= DATA_PATH_LEN) {
-		pr_err("Path too long: %s/%.*s\n", my_ctx->parent_dir, namelen, name);
+	if (snprintf(dirpath, DATA_PATH_LEN, "%s/%.*s", my_ctx->parent_dir,
+		     namelen, name) >= DATA_PATH_LEN) {
+		pr_err("Path too long: %s/%.*s\n", my_ctx->parent_dir, namelen,
+		       name);
 		return FILLDIR_ACTOR_CONTINUE;
 	}
 
 	if (d_type == DT_DIR && my_ctx->depth > 0 &&
-		(my_ctx->stop && !*my_ctx->stop)) {
-		struct data_path *data = kzalloc(sizeof(struct data_path), GFP_KERNEL);
+	    (my_ctx->stop && !*my_ctx->stop)) {
+		struct data_path *data =
+			kzalloc(sizeof(struct data_path), GFP_KERNEL);
 
 		if (!data) {
 			pr_err("Failed to allocate memory for %s\n", dirpath);
@@ -126,9 +129,11 @@ FILLDIR_RETURN_TYPE my_actor(struct dir_context *ctx, const char *name,
 		data->depth = my_ctx->depth - 1;
 		list_add_tail(&data->list, my_ctx->data_path_list);
 	} else {
-		if ((namelen == 8) && (strncmp(name, "base.apk", namelen) == 0)) {
+		if ((namelen == 8) &&
+		    (strncmp(name, "base.apk", namelen) == 0)) {
 			struct apk_path_hash *pos, *n;
-			unsigned int hash = full_name_hash(NULL, dirpath, strlen(dirpath));
+			unsigned int hash =
+				full_name_hash(NULL, dirpath, strlen(dirpath));
 			list_for_each_entry (pos, &apk_path_hash_list, list) {
 				if (hash == pos->hash) {
 					pos->exists = true;
@@ -137,22 +142,27 @@ FILLDIR_RETURN_TYPE my_actor(struct dir_context *ctx, const char *name,
 			}
 
 			bool is_manager = is_manager_apk(dirpath);
-			pr_debug("Found new base.apk at path: %s, is_manager: %d\n", dirpath,
-					is_manager);
+			pr_debug(
+				"Found new base.apk at path: %s, is_manager: %d\n",
+				dirpath, is_manager);
 			if (is_manager) {
 				crown_manager(dirpath, my_ctx->private_data);
 				*my_ctx->stop = 1;
 
 				// Manager found, clear APK cache list
-				list_for_each_entry_safe (pos, n, &apk_path_hash_list, list) {
+				list_for_each_entry_safe (
+					pos, n, &apk_path_hash_list, list) {
 					list_del(&pos->list);
 					kfree(pos);
 				}
 			} else {
-				struct apk_path_hash *apk_data = kzalloc(sizeof(struct apk_path_hash), GFP_KERNEL);
+				struct apk_path_hash *apk_data =
+					kzalloc(sizeof(struct apk_path_hash),
+						GFP_KERNEL);
 				apk_data->hash = hash;
 				apk_data->exists = true;
-				list_add_tail(&apk_data->list, &apk_path_hash_list);
+				list_add_tail(&apk_data->list,
+					      &apk_path_hash_list);
 			}
 		}
 	}
@@ -184,37 +194,47 @@ void search_manager(const char *path, int depth, struct list_head *uid_data)
 
 		list_for_each_entry_safe (pos, n, &data_path_list, list) {
 			struct my_dir_context ctx = { .ctx.actor = my_actor,
-										.data_path_list = &data_path_list,
-										.parent_dir = pos->dirpath,
-										.private_data = uid_data,
-										.depth = pos->depth,
-										.stop = &stop };
+						      .data_path_list =
+							      &data_path_list,
+						      .parent_dir =
+							      pos->dirpath,
+						      .private_data = uid_data,
+						      .depth = pos->depth,
+						      .stop = &stop };
 			struct file *file;
 
 			if (!stop) {
-				file = filp_open(pos->dirpath, O_RDONLY | O_NOFOLLOW, 0);
+				file = filp_open(pos->dirpath,
+						 O_RDONLY | O_NOFOLLOW, 0);
 				if (IS_ERR(file)) {
 					pr_err("Failed to open directory: %s, err: %ld\n",
-						pos->dirpath, PTR_ERR(file));
+					       pos->dirpath, PTR_ERR(file));
 					goto skip_iterate;
 				}
 
 				// grab magic on first folder, which is /data/app
 				if (!data_app_magic) {
 					if (file->f_inode->i_sb->s_magic) {
-						data_app_magic = file->f_inode->i_sb->s_magic;
-						pr_debug("%s: dir: %s got magic! 0x%lx\n", __func__,
-								pos->dirpath, data_app_magic);
+						data_app_magic =
+							file->f_inode->i_sb
+								->s_magic;
+						pr_debug(
+							"%s: dir: %s got magic! 0x%lx\n",
+							__func__, pos->dirpath,
+							data_app_magic);
 					} else {
 						filp_close(file, NULL);
 						goto skip_iterate;
 					}
 				}
 
-				if (file->f_inode->i_sb->s_magic != data_app_magic) {
-					pr_debug("%s: skip: %s magic: 0x%lx expected: 0x%lx\n",
-							__func__, pos->dirpath,
-							file->f_inode->i_sb->s_magic, data_app_magic);
+				if (file->f_inode->i_sb->s_magic !=
+				    data_app_magic) {
+					pr_debug(
+						"%s: skip: %s magic: 0x%lx expected: 0x%lx\n",
+						__func__, pos->dirpath,
+						file->f_inode->i_sb->s_magic,
+						data_app_magic);
 					filp_close(file, NULL);
 					goto skip_iterate;
 				}
@@ -246,7 +266,7 @@ static bool is_uid_exist(uid_t uid, char *package, void *data)
 	bool exist = false;
 	list_for_each_entry (np, list, list) {
 		if (np->uid == uid % PER_USER_RANGE &&
-			strncmp(np->package, package, KSU_MAX_PACKAGE_NAME) == 0) {
+		    strncmp(np->package, package, KSU_MAX_PACKAGE_NAME) == 0) {
 			exist = true;
 			break;
 		}
@@ -258,8 +278,8 @@ void track_throne(bool prune_only)
 {
 	struct file *fp = filp_open(SYSTEM_PACKAGES_LIST_PATH, O_RDONLY, 0);
 	if (IS_ERR(fp)) {
-		pr_err("%s: open " SYSTEM_PACKAGES_LIST_PATH " failed: %ld\n", __func__,
-			PTR_ERR(fp));
+		pr_err("%s: open " SYSTEM_PACKAGES_LIST_PATH " failed: %ld\n",
+		       __func__, PTR_ERR(fp));
 		return;
 	}
 
@@ -283,7 +303,8 @@ void track_throne(bool prune_only)
 		}
 		buf[count] = '\0';
 
-		struct uid_data *data = kzalloc(sizeof(struct uid_data), GFP_KERNEL);
+		struct uid_data *data =
+			kzalloc(sizeof(struct uid_data), GFP_KERNEL);
 		if (!data) {
 			filp_close(fp, 0);
 			goto out;
@@ -325,7 +346,7 @@ void track_throne(bool prune_only)
 	 */
 	{
 		struct uid_data *manager_entry = NULL;
-		list_for_each_entry(np, &uid_list, list) {
+		list_for_each_entry (np, &uid_list, list) {
 			if (strcmp(np->package, KSU_MANAGER_PACKAGE) == 0) {
 				manager_entry = np;
 				break;
