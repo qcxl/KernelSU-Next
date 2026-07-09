@@ -13,12 +13,34 @@
 #include <cstdlib>
 
 #include <unistd.h>
+#include <sys/stat.h>
 #include <climits>
-#include <sys/syscall.h>
 #include <cerrno>
+#include <jni.h>
 #include "ksu.h"
+#include "uapi/supercall.h"
 
 static int fd = -1;
+
+/* Set via JNI from Kotlin (Natives.setKsuFd).
+   The Kotlin side obtains the fd by running ksu_fd_helper via root shell
+   (bypassing seccomp which blocks SYS_reboot for untrusted_app). */
+static int preset_fd = -1;
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_rifsxd_ksunext_Natives_setKsuFd(JNIEnv *env, jclass, jint ksu_fd) {
+    preset_fd = ksu_fd;
+    // Also cache it globally so scan_driver_fd doesn't need JNI
+    if (ksu_fd >= 0) {
+        fd = ksu_fd;
+    }
+}
+
+static bool is_ksu_present() {
+    // Check if KSU module exists in sysfs
+    struct stat st;
+    return stat("/sys/module/kernelsu", &st) == 0 && S_ISDIR(st.st_mode);
+}
 
 static inline int scan_driver_fd() {
     const char *kName = "[ksu_driver]";
@@ -60,7 +82,40 @@ static inline int scan_driver_fd() {
     }
 
     closedir(dir);
-    return found;
+
+    if (found >= 0) {
+        return found;
+    }
+
+    // Fallback 1: use preset fd set via JNI (setKsuFd from Kotlin)
+    if (preset_fd >= 0) {
+        return preset_fd;
+    }
+
+    // Fallback 2: request KSU fd via prctl(0xDEADBEEF, ...)
+    // prctl() is NOT blocked by seccomp for untrusted_app, unlike SYS_reboot.
+    // Requires kernel with ksu_handle_prctl support.
+    // No KSU presence check needed - prctl returns EINVAL if not supported.
+    {
+        int ksu_fd = -1;
+        prctl(KSU_INSTALL_MAGIC1, KSU_INSTALL_MAGIC2, &ksu_fd, 0, 0);
+        if (ksu_fd >= 0) {
+            return ksu_fd;
+        }
+    }
+
+    // Fallback 3: read from well-known file (written by root shell helper)
+    FILE *f = fopen("/data/local/tmp/ksu_fd", "r");
+    if (f) {
+        int file_fd = -1;
+        if (fscanf(f, "%d", &file_fd) == 1 && file_fd >= 0) {
+            fclose(f);
+            return file_fd;
+        }
+        fclose(f);
+    }
+
+    return -1;
 }
 
 template<typename... Args>
