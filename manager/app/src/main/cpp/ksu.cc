@@ -304,11 +304,11 @@ bool is_selinux_hide_enabled() {
     return value != 0;
 }
 
-int set_selinux_enforce(bool enforce) {
+bool set_selinux_enforce(bool enforce) {
     if (!set_feature(KSU_FEATURE_SET_SELINUX_ENFORCE, enforce ? 1 : 0)) {
-        return -errno;
+        return false;
     }
-    return 0;
+    return true;
 }
 
 bool is_selinux_enforce() {

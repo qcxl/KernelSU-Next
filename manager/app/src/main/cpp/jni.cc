@@ -430,7 +430,7 @@ Java_com_rifsxd_ksunext_Natives_isSelinuxEnforce(JNIEnv *env, jobject thiz) {
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_rifsxd_ksunext_Natives_setSelinuxEnforce(JNIEnv *env, jobject thiz, jboolean enforce) {
-    return set_selinux_enforce(enforce);
+    return set_selinux_enforce(enforce) ? 0 : -1;
 }
 
 extern "C"
