@@ -39,16 +39,6 @@ jobs:
             os: ubuntu-latest
           - target: x86_64-linux-android
             os: ubuntu-latest
-    uses: ./.github/workflows/ksud.yml
-    with:
-      target: ${{ matrix.target }}
-      os: ${{ matrix.os }}
-
-  build-ksud-extra:
-    needs: [build-lkm, build-ksuinit]
-    strategy:
-      matrix:
-        include:
           - target: x86_64-pc-windows-gnu # windows pc
             os: ubuntu-latest
           - target: x86_64-apple-darwin # Intel mac
