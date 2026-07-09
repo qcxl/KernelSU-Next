@@ -32,6 +32,7 @@
 #include "manager/manager_identity.h"
 #include "klog.h"
 #include "hook/patch_memory.h"
+#include "hook/lsm_hook.h"
 #include "selinux/selinux.h"
 
 /* ============= 常量 ============= */
@@ -75,6 +76,9 @@ enum sel_inos {
 typedef ssize_t (*write_op_fn)(struct file *file, char *buf, size_t size);
 typedef int (*setprocattr_fn)(const char *name, void *value, size_t size);
 
+static int __nocfi my_setprocattr(const char *name, void *value, size_t size);
+struct ksu_lsm_hook selinux_setprocattr_hook = KSU_LSM_HOOK_INIT(setprocattr, "selinux_setprocattr", my_setprocattr, 0);
+
 /* ============= 全局状态 ============= */
 
 static DEFINE_MUTEX(selinux_hide_mutex);
@@ -85,8 +89,6 @@ static write_op_fn *context_write_slot = NULL;
 static write_op_fn *access_write_slot = NULL;
 static write_op_fn orig_context_write = NULL;
 static write_op_fn orig_access_write = NULL;
-static setprocattr_fn orig_setprocattr = NULL;
-static struct security_hook_list *setprocattr_entry = NULL;
 
 /* ============= 辅助函数 ============= */
 
@@ -140,9 +142,9 @@ static ssize_t my_write_access(struct file *file, char *buf, size_t size)
 	return orig_access_write(file, buf, size);
 }
 
-/* ============= my_setprocattr (直接操作 security_hook_heads) ============= */
+/* ============= my_setprocattr (通过 ksu_lsm_hook 基础设施) ============= */
 
-static int my_setprocattr(const char *name, void *value, size_t size)
+static int __nocfi my_setprocattr(const char *name, void *value, size_t size)
 {
 	if (ksu_selinux_hide_enabled &&
 	    ksu_selinux_hide_running &&
@@ -153,7 +155,7 @@ static int my_setprocattr(const char *name, void *value, size_t size)
 				return -EACCES;
 		}
 	}
-	return orig_setprocattr(name, value, size);
+	return ((setprocattr_fn)selinux_setprocattr_hook.original)(name, value, size);
 }
 
 /* ============= hook / unhook 安装 ============= */
@@ -209,35 +211,13 @@ static void hook_write_ops(void)
 
 static void hook_selinux_setprocattr(void)
 {
-	struct security_hook_heads *heads;
-	setprocattr_fn target;
+	int ret;
 
-	if (setprocattr_entry)
-		return;
-
-	heads = (struct security_hook_heads *)kallsyms_lookup_name("security_hook_heads");
-	if (!heads) {
-		pr_err("selinux_hide: security_hook_heads not found\n");
-		return;
-	}
-
-	target = (setprocattr_fn)kallsyms_lookup_name("selinux_setprocattr");
-	if (!target) {
-		pr_err("selinux_hide: selinux_setprocattr not found\n");
-		return;
-	}
-
-	struct security_hook_list *hp;
-	hlist_for_each_entry(hp, &heads->setprocattr, list) {
-		if ((setprocattr_fn)hp->hook.setprocattr == target) {
-			orig_setprocattr = target;
-			setprocattr_entry = hp;
-			WRITE_ONCE(hp->hook.setprocattr, my_setprocattr);
-			pr_info("selinux_hide: selinux_setprocattr hooked\n");
-			return;
-		}
-	}
-	pr_err("selinux_hide: setprocattr entry not found in hook list\n");
+	ret = ksu_lsm_hook(&selinux_setprocattr_hook);
+	if (ret)
+		pr_err("selinux_hide: hook selinux_setprocattr err: %d\n", ret);
+	else
+		pr_info("selinux_hide: selinux_setprocattr hooked\n");
 }
 
 static void unhook_write_ops(void)
@@ -274,12 +254,7 @@ static void unhook_write_ops(void)
 
 static void unhook_selinux_setprocattr(void)
 {
-	if (!setprocattr_entry || !orig_setprocattr)
-		return;
-
-	WRITE_ONCE(setprocattr_entry->hook.setprocattr, (void *)orig_setprocattr);
-	setprocattr_entry = NULL;
-	orig_setprocattr = NULL;
+	ksu_lsm_unhook(&selinux_setprocattr_hook);
 }
 
 /* ============= enable / disable / unhook ============= */
