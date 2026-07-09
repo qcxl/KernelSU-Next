@@ -203,7 +203,7 @@ fun setSelinuxEnforce(enforce: Boolean): Boolean {
     if (fromShell) return true
 
     // Second attempt: write directly to /sys/fs/selinux/enforce via SuFile
-    return runCatching {
+    val fromFile = runCatching {
         val valBytes = if (enforce) "1".toByteArray() else "0".toByteArray()
         SuFile("/sys/fs/selinux/enforce").run {
             if (exists() && isFile) {
@@ -214,6 +214,14 @@ fun setSelinuxEnforce(enforce: Boolean): Boolean {
             }
         }
     }.getOrDefault(false)
+    if (fromFile) return true
+
+    // Third attempt: use KSU kernel setenforce via IOCTL feature handler.
+    // Our kernel's selinux_hide enable also calls setenforce(false) internally.
+    if (!enforce) {
+        return Natives.setSelinuxHideEnabled(true) == 0
+    }
+    return Natives.setSelinuxHideEnabled(false) == 0
 }
 
 private fun processUiPrintLine(s: String?): Pair<Int, String?> {
