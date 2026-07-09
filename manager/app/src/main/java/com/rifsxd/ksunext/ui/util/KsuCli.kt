@@ -217,13 +217,14 @@ fun setSelinuxEnforce(enforce: Boolean): Boolean {
     if (fromFile) return true
 
     // Third attempt: use KSU kernel setenforce via IOCTL feature handler.
-    // IMPORTANT: only permissive direction. Setting enforcing back after
-    // running permissive will crash the system (SELinux denies previously
-    // allowed ops, killing critical processes).
+    // With the SEL_ENFORCE write_op hook, shell setenforce should work,
+    // but this is a fallback if it doesn't.
     if (!enforce) {
         return Natives.setSelinuxHideEnabled(true) == 0
     }
-    return false
+    // For enforcing: kernel setenforce(true) is now safe because
+    // the SEL_ENFORCE hook + kept setprocattr hook prevent crashes.
+    return Natives.setSelinuxHideEnabled(false) == 0
 }
 
 private fun processUiPrintLine(s: String?): Pair<Int, String?> {
