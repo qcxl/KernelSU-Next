@@ -62,6 +62,11 @@ int set_selinux_hide_enabled(bool enabled);
 
 bool is_selinux_hide_enabled();
 
+// SELinux enforce
+bool set_selinux_enforce(bool enforce);
+
+bool is_selinux_enforce();
+
 // Avc spoof
 bool set_avc_spoof_enabled(bool enabled);
 

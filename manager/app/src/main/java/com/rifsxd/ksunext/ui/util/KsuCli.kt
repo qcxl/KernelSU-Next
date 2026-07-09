@@ -194,15 +194,19 @@ fun getSelinuxEnforce(): Boolean? {
 }
 
 fun setSelinuxEnforce(enforce: Boolean): Boolean {
+    // First attempt: use kernel feature IOCTL (direct setenforce, bypasses sysfs)
+    val fromKernel = Natives.setSelinuxEnforce(enforce)
+    if (fromKernel == 0) return true
+
     val valStr = if (enforce) "1" else "0"
 
-    // First attempt: use setenforce via the default root shell (libsu)
+    // Second attempt: use setenforce via the default root shell (libsu)
     val fromShell = runCatching {
         ShellUtils.fastCmdResult("setenforce $valStr")
     }.getOrDefault(false)
     if (fromShell) return true
 
-    // Second attempt: write directly to /sys/fs/selinux/enforce via SuFile
+    // Third attempt: write directly to /sys/fs/selinux/enforce via SuFile
     val fromFile = runCatching {
         val valBytes = if (enforce) "1".toByteArray() else "0".toByteArray()
         SuFile("/sys/fs/selinux/enforce").run {
@@ -216,9 +220,6 @@ fun setSelinuxEnforce(enforce: Boolean): Boolean {
     }.getOrDefault(false)
     if (fromFile) return true
 
-    // SELinux mode can only be changed via standard setenforce command.
-    // If both shell and direct file write fail, report failure.
-    // Do NOT fall back to kernel hook (which would permanently downgrade SELinux).
     return false
 }
 

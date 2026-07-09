@@ -304,6 +304,25 @@ bool is_selinux_hide_enabled() {
     return value != 0;
 }
 
+int set_selinux_enforce(bool enforce) {
+    if (!set_feature(KSU_FEATURE_SET_SELINUX_ENFORCE, enforce ? 1 : 0)) {
+        return -errno;
+    }
+    return 0;
+}
+
+bool is_selinux_enforce() {
+    uint64_t value = 0;
+    bool supported = false;
+    if (!get_feature(KSU_FEATURE_SET_SELINUX_ENFORCE, &value, &supported)) {
+        return true;
+    }
+    if (!supported) {
+        return true;
+    }
+    return value != 0;
+}
+
 bool set_avc_spoof_enabled(bool enabled) {
     struct ksu_set_feature_cmd cmd = {};
     cmd.feature_id = KSU_FEATURE_AVC_SPOOF;

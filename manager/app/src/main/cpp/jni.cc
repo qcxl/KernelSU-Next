@@ -422,6 +422,18 @@ Java_com_rifsxd_ksunext_Natives_setAvcSpoofEnabled(JNIEnv *env, jobject thiz, jb
 }
 
 extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_rifsxd_ksunext_Natives_isSelinuxEnforce(JNIEnv *env, jobject thiz) {
+    return is_selinux_enforce();
+}
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_rifsxd_ksunext_Natives_setSelinuxEnforce(JNIEnv *env, jobject thiz, jboolean enforce) {
+    return set_selinux_enforce(enforce);
+}
+
+extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_rifsxd_ksunext_Natives_getUserName(JNIEnv *env, jobject thiz, jint uid) {
     struct passwd *pw = getpwuid((uid_t) uid);
