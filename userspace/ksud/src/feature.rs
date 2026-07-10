@@ -298,6 +298,12 @@ pub fn set_feature(id: &str, value: u64) -> Result<()> {
 
     set_kernel_feature(feature_id, value)?;
 
+    // Persist to config so the value survives app restart
+    if let Ok(mut config) = load_binary_config() {
+        config.insert(feature_id as u32, value);
+        let _ = save_binary_config(&config);
+    }
+
     println!(
         "Feature '{}' set to {value} ({})",
         feature_id.name(),
