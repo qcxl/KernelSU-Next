@@ -712,6 +712,35 @@ static int add_try_umount(void __user *arg)
 	return 0;
 }
 
+static int do_get_full_version(void __user *arg)
+{
+    struct ksu_get_full_version_cmd cmd = { 0 };
+
+    strscpy(cmd.version_full, KSU_VERSION_FULL, sizeof(cmd.version_full));
+
+    if (copy_to_user(arg, &cmd, sizeof(cmd))) {
+        pr_err("get_full_version: copy_to_user failed\n");
+        return -EFAULT;
+    }
+
+    return 0;
+}
+
+static int do_get_hook_type(void __user *arg)
+{
+    struct ksu_hook_type_cmd cmd = { 0 };
+    const char *type = "Tracepoint Syscall Redirect";
+
+    strscpy(cmd.hook_type, type, sizeof(cmd.hook_type));
+
+    if (copy_to_user(arg, &cmd, sizeof(cmd))) {
+        pr_err("get_hook_type: copy_to_user failed\n");
+        return -EFAULT;
+    }
+
+    return 0;
+}
+
 static int do_get_hook_mode(void __user *arg)
 {
 	struct ksu_get_hook_mode_cmd cmd = { 0 };
@@ -957,6 +986,18 @@ static const struct ksu_ioctl_cmd_map ksu_ioctl_handlers[] = {
         .cmd = KSU_IOCTL_GET_VERSION_TAG,
         .name = "GET_VERSION_TAG",
         .handler = do_get_version_tag,
+        .perm_check = manager_or_root
+    },
+    {
+        .cmd = KSU_IOCTL_GET_FULL_VERSION,
+        .name = "GET_FULL_VERSION",
+        .handler = do_get_full_version,
+        .perm_check = always_allow
+    },
+    {
+        .cmd = KSU_IOCTL_HOOK_TYPE,
+        .name = "GET_HOOK_TYPE",
+        .handler = do_get_hook_type,
         .perm_check = manager_or_root
     },
     {
