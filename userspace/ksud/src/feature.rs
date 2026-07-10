@@ -254,9 +254,22 @@ pub fn get_feature_config(id: &str) -> Result<()> {
             "Status: {}",
             if *value != 0 { "enabled" } else { "disabled" }
         );
-    } else {
-        println!("Not set in config");
+        return Ok(());
     }
+
+    // Fallback: read from kernel if not in config
+    if let Ok((value, supported)) = crate::ksucalls::get_feature(id_u32) {
+        if supported {
+            println!("Value: {value}");
+            println!(
+                "Status: {}",
+                if value != 0 { "enabled" } else { "disabled" }
+            );
+            return Ok(());
+        }
+    }
+
+    println!("Not set in config");
 
     Ok(())
 }
