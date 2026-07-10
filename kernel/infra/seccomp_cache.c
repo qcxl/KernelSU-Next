@@ -32,6 +32,7 @@ struct seccomp_filter {
 
 void ksu_seccomp_clear_cache(struct seccomp_filter *filter, int nr)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
 	if (!filter) {
 		return;
 	}
@@ -45,10 +46,16 @@ void ksu_seccomp_clear_cache(struct seccomp_filter *filter, int nr)
 		clear_bit(nr, filter->cache.allow_compat);
 	}
 #endif
+#else
+	/* pre-6.1: struct seccomp_filter has no cache field; silently skip */
+	(void)filter;
+	(void)nr;
+#endif
 }
 
 void ksu_seccomp_allow_cache(struct seccomp_filter *filter, int nr)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
 	if (!filter) {
 		return;
 	}
@@ -61,5 +68,10 @@ void ksu_seccomp_allow_cache(struct seccomp_filter *filter, int nr)
 	if (nr >= 0 && nr < SECCOMP_ARCH_COMPAT_NR) {
 		set_bit(nr, filter->cache.allow_compat);
 	}
+#endif
+#else
+	/* pre-6.1: struct seccomp_filter has no cache field; silently skip */
+	(void)filter;
+	(void)nr;
 #endif
 }
