@@ -109,8 +109,10 @@ suspend fun getFeatureStatus(feature: String): String = withContext(Dispatchers.
 suspend fun getFeaturePersistValue(feature: String): Long? = withContext(Dispatchers.IO) {
     val shell = createRootShell(true)
     
+    // Read from kernel directly — kernel is source of truth for runtime state
+    // Config file persistence is only needed for boot-time init_features()
     val out = shell.newJob()
-        .add("${getKsuDaemonPath()} feature get --config $feature").to(ArrayList<String>(), null).exec().out
+        .add("${getKsuDaemonPath()} feature get $feature").to(ArrayList<String>(), null).exec().out
     val valueLine = out.firstOrNull { it.trim().startsWith("Value:") } ?: return@withContext null
     valueLine.substringAfter("Value:").trim().toLongOrNull()
 }
