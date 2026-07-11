@@ -140,6 +140,12 @@ enum Commands {
         #[command(subcommand)]
         command: SusfsAction,
     },
+
+    /// Manage persistent umount configuration
+    Umount {
+        #[command(subcommand)]
+        command: UmountCommand,
+    },
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -165,6 +171,9 @@ enum BootInfo {
         #[arg(short = 'u', long, default_value = "false")]
         ota: bool,
     },
+
+    /// Read ksu_config from current boot image
+    ReadConfig,
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -214,6 +223,9 @@ enum Debug {
 
     /// Get kernel info
     Info,
+
+    /// Print default manager package name
+    Package,
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -542,6 +554,16 @@ enum SusfsAction {
 }
 
 #[derive(clap::Subcommand, Debug)]
+enum UmountCommand {
+    /// Save current kernel umount list to persistent config
+    Save,
+    /// Apply saved config to kernel
+    Apply,
+    /// Clear custom-umount entries from config
+    ClearCustom,
+}
+
+#[derive(clap::Subcommand, Debug)]
 enum Initrc {
     /// Regenerate preinit rc file
     Refresh,
@@ -765,6 +787,10 @@ pub fn run() -> Result<()> {
                 );
                 Ok(())
             }
+            Debug::Package => {
+                println!("{}", crate::defs::WORKING_DIR);
+                Ok(())
+            }
         },
 
         Commands::BootPatch(boot_patch) => crate::boot_patch::patch(boot_patch),
@@ -808,6 +834,12 @@ pub fn run() -> Result<()> {
                 }
                 return Ok(());
             }
+            BootInfo::ReadConfig => {
+                let config = crate::boot_patch::read_config()
+                    .unwrap_or_else(|_| String::new());
+                println!("{config}");
+                return Ok(());
+            }
         },
         Commands::BootRestore(boot_restore) => crate::boot_patch::restore(boot_restore),
         Commands::Resetprop { args } => {
@@ -818,6 +850,12 @@ pub fn run() -> Result<()> {
         Commands::SoftReboot => init_event::soft_reboot(),
 
         Commands::Insmod { module, params } => debug::insmod(&module, &params),
+
+        Commands::Umount { command } => match command {
+            UmountCommand::Save => crate::boot_patch::save_umount_config().map(|_| ()),
+            UmountCommand::Apply => crate::boot_patch::apply_umount_config().map(|_| ()),
+            UmountCommand::ClearCustom => crate::boot_patch::clear_umount_config().map(|_| ()),
+        },
 
         Commands::Susfs { command } => match command {
             SusfsAction::Support => susfsd::show_features(true),

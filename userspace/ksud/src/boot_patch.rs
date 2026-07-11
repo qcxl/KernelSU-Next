@@ -287,6 +287,72 @@ rm -f /data/adb/post-fs-data.d/post_ota.sh
 
         Ok(())
     }
+
+    pub fn read_config() -> Result<String> {
+        let kmi = get_current_kmi().unwrap_or_default();
+        let boot_path = auto_boot_partition_path(&kmi, false, false, &None);
+        let boot_data = super::map_file(&boot_path)?;
+        let boot_image = super::BootImage::parse(&boot_data)?;
+
+        let Some(ramdisk_img) = boot_image.get_blocks().get_ramdisk() else {
+            return Ok(String::new());
+        };
+        let (mut cpio, _) = extract_ramdisk(ramdisk_img)
+            .unwrap_or_else(|_| (Cpio::new(), None));
+
+        let mut result = String::new();
+        if let Some(entry) = cpio.entry_by_name("ksu_config") {
+            if let Some(data) = entry.data() {
+                if let Ok(s) = std::str::from_utf8(data) {
+                    for token in s.split(' ') {
+                        let token = token.trim();
+                        if !token.is_empty() {
+                            result.push_str(token);
+                            result.push('\n');
+                        }
+                    }
+                }
+            }
+        }
+        Ok(result)
+    }
+
+    const UMOUNT_CONFIG_PATH: &str = "/data/adb/ksu/.umount_custom";
+
+    pub fn save_umount_config() -> Result<()> {
+        println!("- Save not supported: kernel umount list enumeration not available");
+        println!("- Use `apply` to restore from existing config file");
+        Ok(())
+    }
+
+    pub fn apply_umount_config() -> Result<()> {
+        let config = std::fs::read_to_string(UMOUNT_CONFIG_PATH)
+            .map_err(|e| anyhow!("failed to read config at {UMOUNT_CONFIG_PATH}: {e}"))?;
+        let mut count = 0;
+        for line in config.lines() {
+            let path = line.trim();
+            if path.is_empty() || path.starts_with('#') {
+                continue;
+            }
+            if let Err(e) = crate::ksucalls::umount_list_add(path, 0) {
+                println!("- Failed to add {path}: {e}");
+            } else {
+                count += 1;
+            }
+        }
+        println!("- Applied {count} umount entries from config");
+        Ok(())
+    }
+
+    pub fn clear_umount_config() -> Result<()> {
+        if std::fs::metadata(UMOUNT_CONFIG_PATH).is_ok() {
+            std::fs::remove_file(UMOUNT_CONFIG_PATH)?;
+            println!("- Cleared umount config at {UMOUNT_CONFIG_PATH}");
+        } else {
+            println!("- No umount config found");
+        }
+        Ok(())
+    }
 }
 
 #[cfg(target_os = "android")]
