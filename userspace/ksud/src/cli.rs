@@ -480,6 +480,65 @@ enum SusfsAction {
     Variant,
     /// Show enabled features
     Features,
+    /// Set SUSFS uname (release, version)
+    SetUname {
+        release: String,
+        version: String,
+    },
+    /// Enable/disable SUSFS kernel logging (0|1)
+    EnableLog {
+        enabled: String,
+    },
+    /// Enable/disable AVC log spoofing (0|1)
+    EnableAvcLogSpoofing {
+        enabled: String,
+    },
+    /// Hide SUS mounts for non-su processes (0|1)
+    HideSusMntsForNonSuProcs {
+        enabled: String,
+    },
+    /// Add open redirect
+    AddOpenRedirect {
+        target: String,
+        redirected: String,
+        uid_scheme: String,
+    },
+    /// Add SUS map
+    AddSusMap {
+        path: String,
+    },
+    /// Add SUS path (applied on next boot via module script)
+    AddSusPath {
+        path: String,
+    },
+    /// Add SUS path loop (applied on next boot via module script)
+    AddSusPathLoop {
+        path: String,
+    },
+    /// Add SUS kstat
+    AddSusKstat {
+        path: String,
+    },
+    /// Update SUS kstat
+    UpdateSusKstat {
+        path: String,
+    },
+    /// Add SUS kstat statically
+    AddSusKstatStatically {
+        path: String,
+        ino: String,
+        dev: String,
+        nlink: String,
+        size: String,
+        atime_sec: String,
+        atime_nsec: String,
+        mtime_sec: String,
+        mtime_nsec: String,
+        ctime_sec: String,
+        ctime_nsec: String,
+        blocks: String,
+        blksize: String,
+    },
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -765,6 +824,51 @@ pub fn run() -> Result<()> {
             SusfsAction::Version => susfsd::show_version(),
             SusfsAction::Variant => susfsd::show_variant(),
             SusfsAction::Features => susfsd::show_features(false),
+            SusfsAction::SetUname { release, version } => susfsd::set_uname(&release, &version),
+            SusfsAction::EnableLog { enabled } => {
+                let v = enabled.parse::<u32>().map_err(|_| anyhow::anyhow!("invalid value, expected 0 or 1"))?;
+                susfsd::enable_log(v != 0)
+            }
+            SusfsAction::EnableAvcLogSpoofing { enabled } => {
+                let v = enabled.parse::<u32>().map_err(|_| anyhow::anyhow!("invalid value, expected 0 or 1"))?;
+                susfsd::enable_avc_log_spoofing(v != 0)
+            }
+            SusfsAction::HideSusMntsForNonSuProcs { enabled } => {
+                let v = enabled.parse::<u32>().map_err(|_| anyhow::anyhow!("invalid value, expected 0 or 1"))?;
+                susfsd::hide_sus_mnts_for_non_su_procs(v != 0)
+            }
+            SusfsAction::AddOpenRedirect { target, redirected, uid_scheme } => {
+                let scheme = uid_scheme.parse::<u32>().map_err(|_| anyhow::anyhow!("invalid uid_scheme"))?;
+                susfsd::add_open_redirect(&target, &redirected, scheme)
+            }
+            SusfsAction::AddSusMap { path } => susfsd::add_sus_map(&path),
+            SusfsAction::AddSusPath { path } => susfsd::add_sus_path(&path),
+            SusfsAction::AddSusPathLoop { path } => susfsd::add_sus_path_loop(&path),
+            SusfsAction::AddSusKstat { path } => susfsd::add_sus_kstat(&path),
+            SusfsAction::UpdateSusKstat { path } => susfsd::update_sus_kstat(&path),
+            SusfsAction::AddSusKstatStatically {
+                path, ino, dev, nlink, size,
+                atime_sec, atime_nsec,
+                mtime_sec, mtime_nsec,
+                ctime_sec, ctime_nsec,
+                blocks, blksize,
+            } => {
+                susfsd::add_sus_kstat_statically(
+                    &path,
+                    ino.parse().map_err(|_| anyhow::anyhow!("invalid ino"))?,
+                    dev.parse().map_err(|_| anyhow::anyhow!("invalid dev"))?,
+                    nlink.parse().map_err(|_| anyhow::anyhow!("invalid nlink"))?,
+                    size.parse().map_err(|_| anyhow::anyhow!("invalid size"))?,
+                    atime_sec.parse().map_err(|_| anyhow::anyhow!("invalid atime_sec"))?,
+                    atime_nsec.parse().map_err(|_| anyhow::anyhow!("invalid atime_nsec"))?,
+                    mtime_sec.parse().map_err(|_| anyhow::anyhow!("invalid mtime_sec"))?,
+                    mtime_nsec.parse().map_err(|_| anyhow::anyhow!("invalid mtime_nsec"))?,
+                    ctime_sec.parse().map_err(|_| anyhow::anyhow!("invalid ctime_sec"))?,
+                    ctime_nsec.parse().map_err(|_| anyhow::anyhow!("invalid ctime_nsec"))?,
+                    blocks.parse().map_err(|_| anyhow::anyhow!("invalid blocks"))?,
+                    blksize.parse().map_err(|_| anyhow::anyhow!("invalid blksize"))?,
+                )
+            }
         },
 
         Commands::Kernel { command } => match command {
