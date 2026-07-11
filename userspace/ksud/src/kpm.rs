@@ -8,6 +8,7 @@ use std::{
 use anyhow::{Result, bail};
 
 use crate::ksu_uapi;
+
 use crate::ksucalls::ksuctl;
 
 const KPM_DIR: &str = "/data/adb/kpm";
@@ -24,10 +25,10 @@ where
         control_code: u64::from(ksu_uapi::SUKISU_KPM_LOAD),
         arg1: path.as_ptr() as u64,
         arg2: args.as_ptr() as u64,
-        result_code: &raw mut ret as u64,
+        result_code: &mut ret as *mut _ as u64,
     };
 
-    ksuctl(ksu_uapi::KSU_IOCTL_KPM, &raw mut cmd)?;
+    ksuctl(ksu_uapi::KSU_IOCTL_KPM, &mut cmd as *mut _)?;
 
     if ret < 0 {
         println!("Failed to load kpm: {}", io::Error::from_raw_os_error(ret));
@@ -43,10 +44,10 @@ pub fn list() -> Result<()> {
         control_code: u64::from(ksu_uapi::SUKISU_KPM_LIST),
         arg1: buf.as_mut_ptr() as u64,
         arg2: buf.len() as u64,
-        result_code: &raw mut ret as u64,
+        result_code: &mut ret as *mut _ as u64,
     };
 
-    ksuctl(ksu_uapi::KSU_IOCTL_KPM, &raw mut cmd)?;
+    ksuctl(ksu_uapi::KSU_IOCTL_KPM, &mut cmd as *mut _)?;
 
     if ret < 0 {
         println!(
@@ -69,10 +70,10 @@ pub fn unload_module(name: String) -> Result<()> {
         control_code: u64::from(ksu_uapi::SUKISU_KPM_UNLOAD),
         arg1: name.as_ptr() as u64,
         arg2: 0,
-        result_code: &raw mut ret as u64,
+        result_code: &mut ret as *mut _ as u64,
     };
 
-    ksuctl(ksu_uapi::KSU_IOCTL_KPM, &raw mut cmd)?;
+    ksuctl(ksu_uapi::KSU_IOCTL_KPM, &mut cmd as *mut _)?;
 
     if ret < 0 {
         println!(
@@ -92,10 +93,10 @@ pub fn info(name: String) -> Result<()> {
         control_code: u64::from(ksu_uapi::SUKISU_KPM_INFO),
         arg1: name.as_ptr() as u64,
         arg2: buf.as_mut_ptr() as u64,
-        result_code: &raw mut ret as u64,
+        result_code: &mut ret as *mut _ as u64,
     };
 
-    ksuctl(ksu_uapi::KSU_IOCTL_KPM, &raw mut cmd)?;
+    ksuctl(ksu_uapi::KSU_IOCTL_KPM, &mut cmd as *mut _)?;
 
     if ret < 0 {
         println!(
@@ -117,10 +118,10 @@ pub fn control(name: String, args: String) -> Result<i32> {
         control_code: u64::from(ksu_uapi::SUKISU_KPM_CONTROL),
         arg1: name.as_ptr() as u64,
         arg2: args.as_ptr() as u64,
-        result_code: &raw mut ret as u64,
+        result_code: &mut ret as *mut _ as u64,
     };
 
-    ksuctl(ksu_uapi::KSU_IOCTL_KPM, &raw mut cmd)?;
+    ksuctl(ksu_uapi::KSU_IOCTL_KPM, &mut cmd as *mut _)?;
 
     if ret < 0 {
         println!(
@@ -138,10 +139,10 @@ pub fn num() -> Result<i32> {
         control_code: u64::from(ksu_uapi::SUKISU_KPM_NUM),
         arg1: 0,
         arg2: 0,
-        result_code: &raw mut ret as u64,
+        result_code: &mut ret as *mut _ as u64,
     };
 
-    ksuctl(ksu_uapi::KSU_IOCTL_KPM, &raw mut cmd)?;
+    ksuctl(ksu_uapi::KSU_IOCTL_KPM, &mut cmd as *mut _)?;
 
     if ret < 0 {
         println!(
@@ -162,10 +163,10 @@ pub fn version() -> Result<()> {
         control_code: u64::from(ksu_uapi::SUKISU_KPM_VERSION),
         arg1: buf.as_mut_ptr() as u64,
         arg2: buf.len() as u64,
-        result_code: &raw mut ret as u64,
+        result_code: &mut ret as *mut _ as u64,
     };
 
-    ksuctl(ksu_uapi::KSU_IOCTL_KPM, &raw mut cmd)?;
+    ksuctl(ksu_uapi::KSU_IOCTL_KPM, &mut cmd as *mut _)?;
 
     if ret < 0 {
         println!(
@@ -190,10 +191,10 @@ pub fn check_version() -> Result<String> {
         control_code: u64::from(ksu_uapi::SUKISU_KPM_VERSION),
         arg1: buf.as_mut_ptr() as u64,
         arg2: buf.len() as u64,
-        result_code: &raw mut ret as u64,
+        result_code: &mut ret as *mut _ as u64,
     };
 
-    ksuctl(ksu_uapi::KSU_IOCTL_KPM, &raw mut cmd)?;
+    ksuctl(ksu_uapi::KSU_IOCTL_KPM, &mut cmd as *mut _)?;
 
     if ret < 0 {
         println!(
