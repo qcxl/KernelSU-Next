@@ -297,7 +297,7 @@ rm -f /data/adb/post-fs-data.d/post_ota.sh
         let Some(ramdisk_img) = boot_image.get_blocks().get_ramdisk() else {
             return Ok(String::new());
         };
-        let (mut cpio, _) = extract_ramdisk(ramdisk_img)
+        let (mut cpio, _) = super::extract_ramdisk(ramdisk_img)
             .unwrap_or_else(|_| (Cpio::new(), None));
 
         let mut result = String::new();
