@@ -941,7 +941,7 @@ pub fn run() -> Result<()> {
             KpmCommand::Num => crate::kpm::num().map(|_| ()),
             KpmCommand::List => crate::kpm::list(),
             KpmCommand::Info { name } => crate::kpm::info(name),
-            KpmCommand::Control { name, args } => crate::kpm::control(name, args.unwrap_or_default()),
+            KpmCommand::Control { name, args } => crate::kpm::control(name, args.unwrap_or_default()).map(|_| ()),
             KpmCommand::Version => crate::kpm::version(),
         },
 
