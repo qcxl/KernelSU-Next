@@ -285,6 +285,7 @@ enum Module {
     },
 
     /// Undo module uninstall mark <id>
+    #[command(alias = "undo-uninstall")]
     Restore {
         /// module id
         id: String,
@@ -485,6 +486,7 @@ enum UmountOp {
 #[derive(clap::Subcommand, Debug)]
 enum SusfsAction {
     /// Show if susfs is supported
+    #[command(alias = "status")]
     Support,
     /// Show susfs version
     Version,
