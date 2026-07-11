@@ -937,11 +937,11 @@ pub fn run() -> Result<()> {
 
         Commands::Kpm { command } => match command {
             KpmCommand::Load { path, args } => crate::kpm::load_module(&path, args.as_deref()),
-            KpmCommand::Unload { name } => crate::kpm::unload_module(&name),
-            KpmCommand::Num => crate::kpm::num(),
+            KpmCommand::Unload { name } => crate::kpm::unload_module(name),
+            KpmCommand::Num => crate::kpm::num().map(|_| ()),
             KpmCommand::List => crate::kpm::list(),
-            KpmCommand::Info { name } => crate::kpm::info(&name),
-            KpmCommand::Control { name, args } => crate::kpm::control(&name, args.as_deref()),
+            KpmCommand::Info { name } => crate::kpm::info(name),
+            KpmCommand::Control { name, args } => crate::kpm::control(name, args.unwrap_or_default()),
             KpmCommand::Version => crate::kpm::version(),
         },
 
