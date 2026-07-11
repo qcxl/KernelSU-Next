@@ -18,6 +18,12 @@ kernelsu-objs += hook/x86_64/syscall_hook.o
 endif
 kernelsu-objs += extras.o
 
+ifeq ($(CONFIG_KPM),y)
+kernelsu-objs += kpm/compact.o
+kernelsu-objs += kpm/kpm.o
+kernelsu-objs += kpm/super_access.o
+endif
+
 kernelsu-objs += infra/file_wrapper.o
 kernelsu-objs += infra/event_queue.o
 kernelsu-objs += infra/seccomp_cache.o

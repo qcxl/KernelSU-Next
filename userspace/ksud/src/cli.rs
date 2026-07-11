@@ -146,6 +146,12 @@ enum Commands {
         #[command(subcommand)]
         command: UmountCommand,
     },
+
+    /// KPM (Kernel Patch Module) management
+    Kpm {
+        #[command(subcommand)]
+        command: KpmCommand,
+    },
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -566,6 +572,24 @@ enum UmountCommand {
 }
 
 #[derive(clap::Subcommand, Debug)]
+enum KpmCommand {
+    /// Load a KPM module
+    Load { path: String, args: Option<String> },
+    /// Unload a KPM module
+    Unload { name: String },
+    /// Get number of loaded KPM modules
+    Num,
+    /// List loaded KPM modules
+    List,
+    /// Get info about a KPM module
+    Info { name: String },
+    /// Send control command to a KPM module
+    Control { name: String, args: Option<String> },
+    /// Get KPM version
+    Version,
+}
+
+#[derive(clap::Subcommand, Debug)]
 enum Initrc {
     /// Regenerate preinit rc file
     Refresh,
@@ -909,6 +933,16 @@ pub fn run() -> Result<()> {
                     blksize.parse().map_err(|_| anyhow::anyhow!("invalid blksize"))?,
                 )
             }
+        },
+
+        Commands::Kpm { command } => match command {
+            KpmCommand::Load { path, args } => crate::kpm::load_module(&path, args.as_deref()),
+            KpmCommand::Unload { name } => crate::kpm::unload_module(&name),
+            KpmCommand::Num => crate::kpm::num(),
+            KpmCommand::List => crate::kpm::list(),
+            KpmCommand::Info { name } => crate::kpm::info(&name),
+            KpmCommand::Control { name, args } => crate::kpm::control(&name, args.as_deref()),
+            KpmCommand::Version => crate::kpm::version(),
         },
 
         Commands::Kernel { command } => match command {

@@ -196,6 +196,8 @@ static const __u32 KSU_IOCTL_GET_HOOK_MODE = _IOC(_IOC_READ, 'K', 98, 0);
 static const __u32 KSU_IOCTL_GET_VERSION_TAG = _IOC(_IOC_READ, 'K', 99, 0);
 static const __u32 KSU_IOCTL_GET_FULL_VERSION = _IOC(_IOC_READ, 'K', 100, 0);
 static const __u32 KSU_IOCTL_HOOK_TYPE = _IOC(_IOC_READ, 'K', 101, 0);
+static const __u32 KSU_IOCTL_ENABLE_KPM = _IOC(_IOC_READ, 'K', 102, 0);
+static const __u32 KSU_IOCTL_KPM = _IOC(_IOC_READ | _IOC_WRITE, 'K', 200, 0);
 
 // SukiSU-Ultra compat structs
 struct ksu_get_full_version_cmd {
@@ -205,5 +207,24 @@ struct ksu_get_full_version_cmd {
 struct ksu_hook_type_cmd {
     char hook_type[32]; // Output: hook type string
 };
+
+struct ksu_enable_kpm_cmd {
+    __u8 enabled; // Output: 1 if KPM is enabled at compile time, 0 otherwise
+};
+
+struct ksu_kpm_cmd {
+    __u64 control_code; // Input: SUKISU_KPM_LOAD (1) through SUKISU_KPM_VERSION (7)
+    __u64 arg1; // Input/Output: depends on operation
+    __u64 arg2; // Input/Output: depends on operation
+    __u64 result_code; // Output: result of KPM operation
+};
+
+static const __u32 SUKISU_KPM_LOAD = 1;
+static const __u32 SUKISU_KPM_UNLOAD = 2;
+static const __u32 SUKISU_KPM_NUM = 3;
+static const __u32 SUKISU_KPM_LIST = 4;
+static const __u32 SUKISU_KPM_INFO = 5;
+static const __u32 SUKISU_KPM_CONTROL = 6;
+static const __u32 SUKISU_KPM_VERSION = 7;
 
 #endif
