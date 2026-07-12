@@ -685,7 +685,7 @@ fun getMetaModule(): String {
 
 fun setAppProfileTemplate(id: String, template: String): Boolean {
     val escapedTemplate = template.replace("\"", "\\\"")
-    val cmd = """${getKsuDaemonPath()} profile set-template "$id" "$escapedTemplate'""""
+    val cmd = """${getKsuDaemonPath()} profile set-template "$id" "$escapedTemplate""""
     return Shell.cmd(cmd)
         .to(ArrayList(), null).exec().isSuccess
 }
