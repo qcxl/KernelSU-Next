@@ -261,8 +261,6 @@ static int prctl_handler_pre(struct kprobe *p, struct pt_regs *regs)
 	int option = (int)PT_REGS_PARM1(real_regs);
 	unsigned long arg2 = PT_REGS_PARM2(real_regs);
 	unsigned long arg3 = PT_REGS_PARM3(real_regs);
-	unsigned long arg4 = PT_REGS_PARM4(real_regs);
-	unsigned long arg5 = PT_REGS_PARM5(real_regs);
 
 	/* prctl(0xDEADBEEF, 0xCAFEBABE, &fd_out, 0, 0) */
 	if (option == KSU_INSTALL_MAGIC1 && arg2 == KSU_INSTALL_MAGIC2) {
