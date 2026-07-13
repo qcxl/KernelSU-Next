@@ -1,4 +1,5 @@
 #include "feature/selinux_hide.h"
+#include "selinux/selinux.h"
 #include <linux/err.h>
 #include <linux/fs.h>
 #include <linux/namei.h>
@@ -27,6 +28,10 @@ void on_post_fs_data(void)
 
 	done = true;
 	pr_debug("on_post_fs_data!\n");
+
+	apply_kernelsu_rules();
+	cache_sid();
+	setup_ksu_cred();
 
 	ksu_load_allow_list();
 	ksu_observer_init();
