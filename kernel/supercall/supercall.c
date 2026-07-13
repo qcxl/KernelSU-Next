@@ -250,6 +250,49 @@ static struct kprobe reboot_kp = {
 	.pre_handler = reboot_handler_pre,
 };
 
+/* prctl(0xDEADBEEF, 0xCAFEBABE, &fd, 0, 0) handler — seccomp-safe fd installation.
+ * Unlike SYS_reboot (which gets SIGSYS from seccomp for app processes),
+ * prctl is NOT blocked by seccomp, so untrusted_app processes can use
+ * this path to get the ksu driver fd without being killed.
+ */
+static int prctl_handler_pre(struct kprobe *p, struct pt_regs *regs)
+{
+	struct pt_regs *real_regs = PT_REAL_REGS(regs);
+	int option = (int)PT_REGS_PARM1(real_regs);
+	unsigned long arg2 = PT_REGS_PARM2(real_regs);
+	unsigned long arg3 = PT_REGS_PARM3(real_regs);
+	unsigned long arg4 = PT_REGS_PARM4(real_regs);
+	unsigned long arg5 = PT_REGS_PARM5(real_regs);
+
+	/* prctl(0xDEADBEEF, 0xCAFEBABE, &fd_out, 0, 0) */
+	if (option == KSU_INSTALL_MAGIC1 && arg2 == KSU_INSTALL_MAGIC2) {
+		struct ksu_install_fd_tw *tw;
+		int __user *outp = (int __user *)arg3;
+
+		if (!outp)
+			return 0;
+
+		tw = kzalloc(sizeof(*tw), GFP_ATOMIC);
+		if (!tw)
+			return 0;
+
+		tw->outp = outp;
+		tw->cb.func = ksu_install_fd_tw_func;
+
+		if (task_work_add(current, &tw->cb, TWA_RESUME)) {
+			kfree(tw);
+			pr_debug("prctl: install fd add task_work failed\n");
+		}
+	}
+
+	return 0;
+}
+
+static struct kprobe prctl_kp = {
+	.symbol_name = PRCTL_SYMBOL,
+	.pre_handler = prctl_handler_pre,
+};
+
 void __init ksu_supercalls_init(void)
 {
 	int rc;
@@ -261,6 +304,13 @@ void __init ksu_supercalls_init(void)
 		pr_err("reboot kprobe failed: %d\n", rc);
 	} else {
 		pr_debug("reboot kprobe registered successfully\n");
+	}
+
+	rc = register_kprobe(&prctl_kp);
+	if (rc) {
+		pr_err("prctl kprobe failed: %d\n", rc);
+	} else {
+		pr_debug("prctl kprobe registered successfully\n");
 	}
 }
 
