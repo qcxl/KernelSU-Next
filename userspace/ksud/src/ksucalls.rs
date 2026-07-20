@@ -28,20 +28,36 @@ fn scan_driver_fd() -> Option<RawFd> {
     None
 }
 
-// Get cached driver fd
+// Get cached driver fd.
+// Tries prctl (seccomp-safe) first, falls back to sys_reboot for root processes.
 fn init_driver_fd() -> Option<RawFd> {
     let fd = scan_driver_fd();
     if fd.is_none() {
         let mut fd = -1;
         unsafe {
+            // prctl path: seccomp-safe (not blocked for untrusted_app).
+            // Intercepted by ksu_handle_prctl in kernel supercall.c.
             libc::syscall(
-                libc::SYS_reboot,
+                libc::SYS_prctl,
                 ksu_uapi::KSU_INSTALL_MAGIC1,
                 ksu_uapi::KSU_INSTALL_MAGIC2,
-                0,
                 &mut fd,
+                0,
+                0,
             );
-        };
+        }
+        if fd < 0 {
+            // fallback: sys_reboot for root / non-seccomp processes
+            unsafe {
+                libc::syscall(
+                    libc::SYS_reboot,
+                    ksu_uapi::KSU_INSTALL_MAGIC1,
+                    ksu_uapi::KSU_INSTALL_MAGIC2,
+                    0,
+                    &mut fd,
+                );
+            };
+        }
         if fd >= 0 { Some(fd) } else { None }
     } else {
         fd
