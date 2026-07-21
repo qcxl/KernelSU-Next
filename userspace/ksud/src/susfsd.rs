@@ -100,6 +100,13 @@ struct SusfsMap {
     err: i32,
 }
 
+#[repr(C)]
+struct SusfsPath {
+    target_ino: u64,
+    target_pathname: [u8; 256],
+    err: i32,
+}
+
 pub fn show_version() -> Result<()> {
     let mut cmd = SusfsVersion {
         version: [0; SUSFS_MAX_VERSION_BUFSIZE],
@@ -269,12 +276,42 @@ pub fn add_sus_map(path: &str) -> Result<()> {
 }
 
 pub fn add_sus_path(path: &str) -> Result<()> {
-    let _ = path;
+    let mut cmd = SusfsPath {
+        target_ino: 0,
+        target_pathname: [0; 256],
+        err: ERR_CMD_NOT_SUPPORTED,
+    };
+    let path_bytes = path.as_bytes();
+    if path_bytes.len() >= cmd.target_pathname.len() {
+        anyhow::bail!("Path too long");
+    }
+    cmd.target_pathname[..path_bytes.len()].copy_from_slice(path_bytes);
+    unsafe {
+        syscall(SYS_reboot, KSU_INSTALL_MAGIC1, SUSFS_MAGIC, CMD_SUSFS_ADD_SUS_PATH, &mut cmd);
+    }
+    if cmd.err != 0 {
+        anyhow::bail!("Failed to add sus path: err={}", cmd.err);
+    }
     Ok(())
 }
 
 pub fn add_sus_path_loop(path: &str) -> Result<()> {
-    let _ = path;
+    let mut cmd = SusfsPath {
+        target_ino: 0,
+        target_pathname: [0; 256],
+        err: ERR_CMD_NOT_SUPPORTED,
+    };
+    let path_bytes = path.as_bytes();
+    if path_bytes.len() >= cmd.target_pathname.len() {
+        anyhow::bail!("Path too long");
+    }
+    cmd.target_pathname[..path_bytes.len()].copy_from_slice(path_bytes);
+    unsafe {
+        syscall(SYS_reboot, KSU_INSTALL_MAGIC1, SUSFS_MAGIC, CMD_SUSFS_ADD_SUS_PATH_LOOP, &mut cmd);
+    }
+    if cmd.err != 0 {
+        anyhow::bail!("Failed to add sus path loop: err={}", cmd.err);
+    }
     Ok(())
 }
 
