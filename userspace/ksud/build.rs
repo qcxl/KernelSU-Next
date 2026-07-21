@@ -77,6 +77,14 @@ fn main() {
 
     let target_os = env::var("CARGO_CFG_TARGET_OS").expect("CARGO_CFG_TARGET_OS not set");
     if target_os == "android" {
-        configure_bindgen();
+        let prebuilt = Path::new("src/bindings_prebuilt.rs");
+        let bindings_dest = out_dir.join("bindings.rs");
+        if prebuilt.exists() {
+            println!("cargo:warning=Using pre-built bindings (skip bindgen)");
+            std::fs::copy(prebuilt, &bindings_dest)
+                .expect("Failed to copy pre-built bindings");
+        } else {
+            configure_bindgen();
+        }
     }
 }
