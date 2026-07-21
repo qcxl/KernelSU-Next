@@ -123,10 +123,11 @@ fun MetaModuleScreen(navigator: DestinationsNavigator) {
 
     val moduleViewModel = viewModel<ModuleViewModel>()
 
-    suspend fun fetchMetaModulesFromJson(jsonUrl: String): List<MetaModule>? {
+    suspend fun fetchMetaModulesFromJson(jsonUrl: String, ctx: android.content.Context): List<MetaModule>? {
         return withContext(Dispatchers.IO) {
             try {
-                val conn = URL(jsonUrl).openConnection() as java.net.HttpURLConnection
+                val finalUrl = com.rifsxd.ksunext.ui.util.ProxyHelper.buildUrl(ctx, jsonUrl)
+                val conn = URL(finalUrl).openConnection() as java.net.HttpURLConnection
                 conn.setRequestProperty("User-Agent", "KernelSU-Next/${BuildConfig.VERSION_CODE}")
                 val text = BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
                 conn.disconnect()
@@ -158,7 +159,7 @@ fun MetaModuleScreen(navigator: DestinationsNavigator) {
         try {
             moduleState = MetaModuleState.Loading
 
-            val baseList = withContext(Dispatchers.IO) { fetchMetaModulesFromJson(modulesJsonUrl) }
+            val baseList = withContext(Dispatchers.IO) { fetchMetaModulesFromJson(modulesJsonUrl, context) }
 
             if (baseList == null) {
                 moduleState = MetaModuleState.Error("Failed to load module list")

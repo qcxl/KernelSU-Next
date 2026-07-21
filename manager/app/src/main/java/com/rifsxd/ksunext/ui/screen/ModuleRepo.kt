@@ -169,10 +169,11 @@ fun ModuleRepoScreen(navigator: DestinationsNavigator) {
         )
     }
 
-    suspend fun fetchModuleReposFromJson(jsonUrl: String): List<ModuleRepo> {
+    suspend fun fetchModuleReposFromJson(jsonUrl: String, ctx: android.content.Context): List<ModuleRepo> {
         return withContext(Dispatchers.IO) {
             try {
-                val conn = URL(jsonUrl).openConnection() as java.net.HttpURLConnection
+                val finalUrl = com.rifsxd.ksunext.ui.util.ProxyHelper.buildUrl(ctx, jsonUrl)
+                val conn = URL(finalUrl).openConnection() as java.net.HttpURLConnection
                 conn.setRequestProperty("User-Agent", "KernelSU-Next/${BuildConfig.VERSION_CODE}")
                 val text = BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
                 conn.disconnect()
@@ -206,7 +207,7 @@ fun ModuleRepoScreen(navigator: DestinationsNavigator) {
             // Fetch all repo JSONs in parallel then merge
             val effectiveUrls = if (nonFreeEnabled) jsonUrls + NON_FREE_JSON_URL else jsonUrls
             val allModules = withContext(Dispatchers.IO) {
-                effectiveUrls.map { url -> async { fetchModuleReposFromJson(url) } }
+                effectiveUrls.map { url -> async { fetchModuleReposFromJson(url, context) } }
                     .awaitAll()
                     .flatten()
             }

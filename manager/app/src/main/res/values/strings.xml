@@ -212,6 +212,12 @@
     <string name="settings_banner">Enable banners</string>
     <string name="settings_banner_summary">Show background banners for modules.</string>
     <string name="customization">Customization</string>
+    <string name="proxy_config">Proxy Configuration</string>
+    <string name="proxy_speed_test">Speed Test</string>
+    <string name="proxy_testing">Testing…</string>
+    <string name="proxy_speed_failed">Failed</string>
+    <string name="settings_proxy_config">Proxy Configuration</string>
+    <string name="settings_proxy_config_summary">GitHub raw content proxy for module repository</string>
     <string name="developer">Developer</string>
     <string name="sucompat_disabled">SUCOMPAT DISABLED</string>
     <string name="zygisk_required">Zygisk required</string>

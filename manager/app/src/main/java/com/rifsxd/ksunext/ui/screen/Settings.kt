@@ -518,6 +518,25 @@ private fun AppSettingsCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
+                    .clickable { navigator.navigate(ProxyConfigScreenDestination) },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                leadingContent = { Icon(Icons.Filled.SwapHoriz, null) },
+                headlineContent = {
+                    Text(
+                        text = stringResource(R.string.settings_proxy_config),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                },
+                supportingContent = {
+                    Text(stringResource(R.string.settings_proxy_config_summary))
+                }
+            )
+
+            ListItem(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
                     .clickable { navigator.navigate(CustomizationScreenDestination) },
                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 leadingContent = { Icon(Icons.Filled.Palette, null) },
