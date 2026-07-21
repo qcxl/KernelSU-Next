@@ -310,3 +310,18 @@ pub fn set_ksu_no_new_privs() -> anyhow::Result<()> {
     }
     Ok(())
 }
+
+#[repr(C)]
+struct KsuSusfsIoctlCmd {
+    cmd_id: u32,
+    arg_ptr: u64,
+}
+
+pub fn susfs_ioctl<T>(cmd_id: u64, arg: &mut T) -> anyhow::Result<i32> {
+    let mut ioctl_cmd = KsuSusfsIoctlCmd {
+        cmd_id: cmd_id as u32,
+        arg_ptr: arg as *mut T as u64,
+    };
+    ksuctl(0x55u32, &raw mut ioctl_cmd)
+        .map_err(|e| anyhow!("susfs ioctl: {e}"))
+}

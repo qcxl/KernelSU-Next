@@ -1,9 +1,8 @@
 use std::ffi::CStr;
+use std::os::raw::c_char;
 use anyhow::{Result, anyhow};
-use libc::{syscall, SYS_reboot, c_char};
 
-const KSU_INSTALL_MAGIC1: u64 = 0xDEADBEEF;
-const SUSFS_MAGIC: u64 = 0xFAFAFAFA;
+use crate::ksucalls;
 
 const CMD_SUSFS_SHOW_VERSION: u64 = 0x555e1;
 const CMD_SUSFS_SHOW_ENABLED_FEATURES: u64 = 0x555e2;
@@ -85,14 +84,13 @@ struct SusfsKstat {
     spoofed_nlink: u32,
     spoofed_size: u64,
     spoofed_atime_tv_sec: i64,
-    spoofed_atime_tv_nsec: u64,
     spoofed_mtime_tv_sec: i64,
-    spoofed_mtime_tv_nsec: u64,
     spoofed_ctime_tv_sec: i64,
-    spoofed_ctime_tv_nsec: u64,
-    spoofed_blocks: u64,
+    spoofed_atime_tv_nsec: i64,
+    spoofed_mtime_tv_nsec: i64,
+    spoofed_ctime_tv_nsec: i64,
     spoofed_blksize: i64,
-    flags: u32,
+    spoofed_blocks: u64,
     err: i32,
 }
 
@@ -114,9 +112,7 @@ pub fn show_version() -> Result<()> {
         version: [0; SUSFS_MAX_VERSION_BUFSIZE],
         err: ERR_CMD_NOT_SUPPORTED,
     };
-    unsafe {
-        syscall(SYS_reboot, KSU_INSTALL_MAGIC1, SUSFS_MAGIC, CMD_SUSFS_SHOW_VERSION, &mut cmd as *mut _);
-    }
+    ksucalls::susfs_ioctl(CMD_SUSFS_SHOW_VERSION, &mut cmd)?;
     check_unsupported(cmd.err, CMD_SUSFS_SHOW_VERSION)?;
     if cmd.err == 0 {
         let version = unsafe { CStr::from_ptr(cmd.version.as_ptr() as *const c_char) }.to_string_lossy();
@@ -132,9 +128,7 @@ pub fn show_variant() -> Result<()> {
         variant: [0; SUSFS_MAX_VARIANT_BUFSIZE],
         err: ERR_CMD_NOT_SUPPORTED,
     };
-    unsafe {
-        syscall(SYS_reboot, KSU_INSTALL_MAGIC1, SUSFS_MAGIC, CMD_SUSFS_SHOW_VARIANT, &mut cmd as *mut _);
-    }
+    ksucalls::susfs_ioctl(CMD_SUSFS_SHOW_VARIANT, &mut cmd)?;
     check_unsupported(cmd.err, CMD_SUSFS_SHOW_VARIANT)?;
     if cmd.err == 0 {
         let variant = unsafe { CStr::from_ptr(cmd.variant.as_ptr() as *const c_char) }.to_string_lossy();
@@ -150,9 +144,7 @@ pub fn show_features(check_only: bool) -> Result<()> {
         features: [0; SUSFS_ENABLED_FEATURES_SIZE],
         err: ERR_CMD_NOT_SUPPORTED,
     };
-    unsafe {
-        syscall(SYS_reboot, KSU_INSTALL_MAGIC1, SUSFS_MAGIC, CMD_SUSFS_SHOW_ENABLED_FEATURES, &mut cmd as *mut _);
-    }
+    ksucalls::susfs_ioctl(CMD_SUSFS_SHOW_ENABLED_FEATURES, &mut cmd)?;
     check_unsupported(cmd.err, CMD_SUSFS_SHOW_ENABLED_FEATURES)?;
     let features_cstr = unsafe { CStr::from_ptr(cmd.features.as_ptr() as *const c_char) };
     let has_features = cmd.err == 0 && !features_cstr.to_bytes().is_empty();
@@ -184,11 +176,9 @@ pub fn set_uname(release: &str, version: &str) -> Result<()> {
     }
     cmd.release[..release_bytes.len()].copy_from_slice(release_bytes);
     cmd.version[..version_bytes.len()].copy_from_slice(version_bytes);
-    unsafe {
-        syscall(SYS_reboot, KSU_INSTALL_MAGIC1, SUSFS_MAGIC, CMD_SUSFS_SET_UNAME, &mut cmd);
-    }
-    if cmd.err != 0 {
-        anyhow::bail!("Failed to set uname: err={}", cmd.err);
+    let ret = ksucalls::susfs_ioctl(CMD_SUSFS_SET_UNAME, &mut cmd)?;
+    if ret != 0 {
+        anyhow::bail!("Failed to set uname: kernel returned err={}", ret);
     }
     Ok(())
 }
@@ -198,9 +188,7 @@ pub fn enable_log(enabled: bool) -> Result<()> {
         enabled: u32::from(enabled),
         err: ERR_CMD_NOT_SUPPORTED,
     };
-    unsafe {
-        syscall(SYS_reboot, KSU_INSTALL_MAGIC1, SUSFS_MAGIC, CMD_SUSFS_ENABLE_LOG, &mut cmd);
-    }
+    ksucalls::susfs_ioctl(CMD_SUSFS_ENABLE_LOG, &mut cmd)?;
     if cmd.err != 0 {
         anyhow::bail!("Failed to enable_log: err={}", cmd.err);
     }
@@ -212,9 +200,7 @@ pub fn enable_avc_log_spoofing(enabled: bool) -> Result<()> {
         enabled: u32::from(enabled),
         err: ERR_CMD_NOT_SUPPORTED,
     };
-    unsafe {
-        syscall(SYS_reboot, KSU_INSTALL_MAGIC1, SUSFS_MAGIC, CMD_SUSFS_ENABLE_AVC_LOG_SPOOFING, &mut cmd);
-    }
+    ksucalls::susfs_ioctl(CMD_SUSFS_ENABLE_AVC_LOG_SPOOFING, &mut cmd)?;
     if cmd.err != 0 {
         anyhow::bail!("Failed to enable_avc_log_spoofing: err={}", cmd.err);
     }
@@ -226,9 +212,7 @@ pub fn hide_sus_mnts_for_non_su_procs(enabled: bool) -> Result<()> {
         enabled: u32::from(enabled),
         err: ERR_CMD_NOT_SUPPORTED,
     };
-    unsafe {
-        syscall(SYS_reboot, KSU_INSTALL_MAGIC1, SUSFS_MAGIC, CMD_SUSFS_HIDE_SUS_MNTS_FOR_NON_SU_PROCS, &mut cmd);
-    }
+    ksucalls::susfs_ioctl(CMD_SUSFS_HIDE_SUS_MNTS_FOR_NON_SU_PROCS, &mut cmd)?;
     if cmd.err != 0 {
         anyhow::bail!("Failed to hide_sus_mnts: err={}", cmd.err);
     }
@@ -249,11 +233,9 @@ pub fn add_open_redirect(target: &str, redirected: &str, uid_scheme: u32) -> Res
     }
     cmd.target_pathname[..target_bytes.len()].copy_from_slice(target_bytes);
     cmd.redirected_pathname[..redirected_bytes.len()].copy_from_slice(redirected_bytes);
-    unsafe {
-        syscall(SYS_reboot, KSU_INSTALL_MAGIC1, SUSFS_MAGIC, CMD_SUSFS_ADD_OPEN_REDIRECT, &mut cmd);
-    }
-    if cmd.err != 0 {
-        anyhow::bail!("Failed to add open redirect: err={}", cmd.err);
+    let ret = ksucalls::susfs_ioctl(CMD_SUSFS_ADD_OPEN_REDIRECT, &mut cmd)?;
+    if ret != 0 {
+        anyhow::bail!("Failed to add open redirect: kernel returned err={}", ret);
     }
     Ok(())
 }
@@ -268,9 +250,7 @@ pub fn add_sus_map(path: &str) -> Result<()> {
         anyhow::bail!("Path too long");
     }
     cmd.target_pathname[..path_bytes.len()].copy_from_slice(path_bytes);
-    unsafe {
-        syscall(SYS_reboot, KSU_INSTALL_MAGIC1, SUSFS_MAGIC, CMD_SUSFS_ADD_SUS_MAP, &mut cmd);
-    }
+    ksucalls::susfs_ioctl(CMD_SUSFS_ADD_SUS_MAP, &mut cmd)?;
     if cmd.err != 0 {
         anyhow::bail!("Failed to add sus map: err={}", cmd.err);
     }
@@ -288,11 +268,9 @@ pub fn add_sus_path(path: &str) -> Result<()> {
         anyhow::bail!("Path too long");
     }
     cmd.target_pathname[..path_bytes.len()].copy_from_slice(path_bytes);
-    unsafe {
-        syscall(SYS_reboot, KSU_INSTALL_MAGIC1, SUSFS_MAGIC, CMD_SUSFS_ADD_SUS_PATH, &mut cmd);
-    }
-    if cmd.err != 0 {
-        anyhow::bail!("Failed to add sus path: err={}", cmd.err);
+    let ret = ksucalls::susfs_ioctl(CMD_SUSFS_ADD_SUS_PATH, &mut cmd)?;
+    if ret != 0 {
+        anyhow::bail!("Failed to add sus path: kernel returned err={}", ret);
     }
     Ok(())
 }
@@ -308,9 +286,7 @@ pub fn add_sus_path_loop(path: &str) -> Result<()> {
         anyhow::bail!("Path too long");
     }
     cmd.target_pathname[..path_bytes.len()].copy_from_slice(path_bytes);
-    unsafe {
-        syscall(SYS_reboot, KSU_INSTALL_MAGIC1, SUSFS_MAGIC, CMD_SUSFS_ADD_SUS_PATH_LOOP, &mut cmd);
-    }
+    ksucalls::susfs_ioctl(CMD_SUSFS_ADD_SUS_PATH_LOOP, &mut cmd)?;
     if cmd.err != 0 {
         anyhow::bail!("Failed to add sus path loop: err={}", cmd.err);
     }
@@ -352,14 +328,13 @@ pub fn add_sus_kstat_statically(
         spoofed_nlink: nlink,
         spoofed_size: size,
         spoofed_atime_tv_sec: atime_sec,
-        spoofed_atime_tv_nsec: atime_nsec_opt,
         spoofed_mtime_tv_sec: mtime_sec,
-        spoofed_mtime_tv_nsec: mtime_nsec_opt,
         spoofed_ctime_tv_sec: ctime_sec,
+        spoofed_atime_tv_nsec: atime_nsec_opt,
+        spoofed_mtime_tv_nsec: mtime_nsec_opt,
         spoofed_ctime_tv_nsec: ctime_nsec_opt,
-        spoofed_blocks: blocks,
         spoofed_blksize: blksize,
-        flags: 0,
+        spoofed_blocks: blocks,
         err: ERR_CMD_NOT_SUPPORTED,
     };
     let path_bytes = path.as_bytes();
@@ -367,11 +342,9 @@ pub fn add_sus_kstat_statically(
         anyhow::bail!("Path too long");
     }
     cmd.target_pathname[..path_bytes.len()].copy_from_slice(path_bytes);
-    unsafe {
-        syscall(SYS_reboot, KSU_INSTALL_MAGIC1, SUSFS_MAGIC, CMD_SUSFS_ADD_SUS_KSTAT_STATICALLY, &mut cmd);
-    }
-    if cmd.err != 0 {
-        anyhow::bail!("Failed to add sus kstat statically: err={}", cmd.err);
+    let ret = ksucalls::susfs_ioctl(CMD_SUSFS_ADD_SUS_KSTAT_STATICALLY, &mut cmd)?;
+    if ret != 0 {
+        anyhow::bail!("Failed to add sus kstat statically: kernel returned err={}", ret);
     }
     Ok(())
 }
