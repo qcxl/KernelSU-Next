@@ -183,7 +183,13 @@
   <string name="system_default">系統預設值</string>
   <string name="settings_banner">啓用橫幅</string>
   <string name="settings_banner_summary">展示模組背景橫幅。</string>
-  <string name="customization">介面選項</string>
+    <string name="customization">介面選項</string>
+    <string name="proxy_config">代理配置</string>
+    <string name="proxy_speed_test">測速</string>
+    <string name="proxy_testing">測速中…</string>
+    <string name="proxy_speed_failed">連線失敗</string>
+    <string name="settings_proxy_config">代理配置</string>
+    <string name="settings_proxy_config_summary">模組倉庫 GitHub 存取代理</string>
   <string name="developer">開發者</string>
   <string name="sucompat_disabled">SU 相容已停用</string>
   <string name="zygisk_required">需要 Zygisk</string>

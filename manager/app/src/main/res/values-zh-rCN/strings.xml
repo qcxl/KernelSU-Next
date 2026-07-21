@@ -184,7 +184,13 @@
   <string name="system_default">系统默认设置</string>
   <string name="settings_banner">启用横幅</string>
   <string name="settings_banner_summary">显示模块背景横幅。</string>
-  <string name="customization">个性化</string>
+    <string name="customization">个性化</string>
+    <string name="proxy_config">代理配置</string>
+    <string name="proxy_speed_test">测速</string>
+    <string name="proxy_testing">测速中…</string>
+    <string name="proxy_speed_failed">连接失败</string>
+    <string name="settings_proxy_config">代理配置</string>
+    <string name="settings_proxy_config_summary">模块仓库 GitHub 访问代理</string>
   <string name="developer">开发者选项</string>
   <string name="sucompat_disabled">SU 兼容层已禁用</string>
   <string name="zygisk_required">需要 Zygisk</string>
