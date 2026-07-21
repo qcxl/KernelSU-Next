@@ -1,5 +1,6 @@
 #![allow(clippy::unreadable_literal)]
 use anyhow::bail;
+use anyhow::Context as _;
 
 use crate::ksu_uapi;
 use std::fs;
@@ -323,5 +324,5 @@ pub fn susfs_ioctl<T>(cmd_id: u64, arg: &mut T) -> anyhow::Result<i32> {
         arg_ptr: arg as *mut T as u64,
     };
     ksuctl(0x55u32, &raw mut ioctl_cmd)
-        .map_err(|e| anyhow!("susfs ioctl: {e}"))
+        .map_err(|e| anyhow::anyhow!("susfs ioctl: {e}"))
 }
