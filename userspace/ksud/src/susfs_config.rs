@@ -5,6 +5,7 @@
 
 use std::path::Path;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use anyhow::{Result, Context};
 use const_format::concatcp;
 use serde::{Serialize, Deserialize};
@@ -31,34 +32,9 @@ pub struct SusfsConfig {
 }
 
 const CONFIG_PATH: &str = concatcp!(crate::defs::ADB_DIR, "ksu/susfs_config.json");
-const BOOT_ID_PATH: &str = concatcp!(crate::defs::ADB_DIR, "ksu/.susfs_boot_id");
 
-/// 读取当前启动 ID（/proc/sys/kernel/random/boot_id 每次重启变化）
-fn current_boot_id() -> Result<String> {
-    let id = std::fs::read_to_string("/proc/sys/kernel/random/boot_id")
-        .context("read boot_id")?;
-    Ok(id.trim().to_string())
-}
-
-/// 检查是否首次运行（新启动后第一次执行 ksud）
-pub fn is_new_boot() -> bool {
-    let current = match current_boot_id() {
-        Ok(id) => id,
-        Err(_) => return true, // 读不到就总是恢复
-    };
-    let saved = match std::fs::read_to_string(BOOT_ID_PATH) {
-        Ok(id) => id.trim().to_string(),
-        Err(_) => return true, // 文件不存在 → 首次启动
-    };
-    current != saved
-}
-
-/// 标记本启动已恢复
-fn mark_boot_restored() {
-    if let Ok(id) = current_boot_id() {
-        let _ = std::fs::write(BOOT_ID_PATH, id.as_bytes());
-    }
-}
+/// 本进程启动后是否已恢复过（进程退出后自动清零）
+static RESTORED: AtomicBool = AtomicBool::new(false);
 
 /// 内置默认配置（格式 /data 后也自动生效）
 fn default_config() -> SusfsConfig {
@@ -173,9 +149,9 @@ pub fn apply(config: &SusfsConfig) {
     }
 }
 
-/// 在 CLI 入口处调用：新启动则恢复配置
+/// 在 CLI 入口处调用：每个进程生命周期内只恢复一次
 pub fn restore_if_needed() {
-    if !is_new_boot() {
+    if RESTORED.load(Ordering::Relaxed) {
         return;
     }
     match load() {
@@ -201,7 +177,7 @@ pub fn restore_if_needed() {
             log::warn!("failed to load SUSFS config: {e:#}");
         }
     }
-    mark_boot_restored();
+    RESTORED.store(true, Ordering::Relaxed);
 }
 
 /// 从当前 susfsd 模块读取状态构建配置（用于后续保存）
