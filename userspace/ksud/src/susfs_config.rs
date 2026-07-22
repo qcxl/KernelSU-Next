@@ -71,6 +71,7 @@ fn default_config() -> SusfsConfig {
             "/data/adb/ksu/su".to_string(),
             "/system/addon.d".to_string(),
         ],
+        sus_path_loops: vec![],
         sus_maps: vec!["/data/adb/".to_string()],
         sus_mounts: vec!["/vendor".to_string(), "/odm".to_string()],
         enable_log: false,
