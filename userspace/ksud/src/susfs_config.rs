@@ -19,6 +19,7 @@ pub struct SusfsConfig {
     pub sus_paths: Vec<String>,
     pub sus_path_loops: Vec<String>,
     pub sus_maps: Vec<String>,
+    pub sus_mounts: Vec<String>,
     pub enable_log: bool,
     pub enable_avc_log_spoofing: bool,
     pub hide_sus_mnts: bool,
@@ -102,6 +103,11 @@ pub fn apply(config: &SusfsConfig) {
         let _ = susfsd::add_sus_map(path);
     }
 
+    // sus_mounts
+    for path in &config.sus_mounts {
+        let _ = susfsd::add_sus_mount(path);
+    }
+
     // 开关
     if config.enable_log {
         let _ = susfsd::enable_log(true);
@@ -160,6 +166,16 @@ pub fn append_sus_map(path: &str) -> Result<()> {
     let mut config = load().unwrap_or_default();
     if !config.sus_maps.iter().any(|p| p == path) {
         config.sus_maps.push(path.to_string());
+        save(&config)
+    } else {
+        Ok(())
+    }
+}
+
+pub fn append_sus_mount(path: &str) -> Result<()> {
+    let mut config = load().unwrap_or_default();
+    if !config.sus_mounts.iter().any(|p| p == path) {
+        config.sus_mounts.push(path.to_string());
         save(&config)
     } else {
         Ok(())

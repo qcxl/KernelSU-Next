@@ -16,6 +16,7 @@ const CMD_SUSFS_ENABLE_LOG: u64 = 0x555a0;
 const CMD_SUSFS_ENABLE_AVC_LOG_SPOOFING: u64 = 0x60010;
 const CMD_SUSFS_HIDE_SUS_MNTS_FOR_NON_SU_PROCS: u64 = 0x55561;
 const CMD_SUSFS_ADD_OPEN_REDIRECT: u64 = 0x555c0;
+const CMD_SUSFS_ADD_SUS_MOUNT: u64 = 0x55560;
 
 const SUSFS_ENABLED_FEATURES_SIZE: usize = 8192;
 const SUSFS_MAX_VERSION_BUFSIZE: usize = 16;
@@ -101,10 +102,33 @@ struct SusfsMap {
 }
 
 #[repr(C)]
+struct SusfsMount {
+    target_pathname: [u8; 256],
+    target_dev: u64,
+}
+
+#[repr(C)]
 struct SusfsPath {
     target_ino: u64,
     target_pathname: [u8; 256],
     err: i32,
+}
+
+pub fn add_sus_mount(path: &str) -> Result<()> {
+    let mut cmd = SusfsMount {
+        target_pathname: [0; 256],
+        target_dev: 0,
+    };
+    let path_bytes = path.as_bytes();
+    if path_bytes.len() >= cmd.target_pathname.len() {
+        anyhow::bail!("Path too long");
+    }
+    cmd.target_pathname[..path_bytes.len()].copy_from_slice(path_bytes);
+    let ret = ksucalls::susfs_ioctl(CMD_SUSFS_ADD_SUS_MOUNT, &mut cmd)?;
+    if ret != 0 {
+        anyhow::bail!("Failed to add sus mount: kernel returned err={}", ret);
+    }
+    Ok(())
 }
 
 pub fn show_version() -> Result<()> {

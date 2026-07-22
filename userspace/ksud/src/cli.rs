@@ -527,6 +527,10 @@ enum SusfsAction {
     AddSusMap {
         path: String,
     },
+    /// Add SUS mount (hide mount from /proc/mounts)
+    AddSusMount {
+        path: String,
+    },
     /// Add SUS path (applied on next boot via module script)
     AddSusPath {
         path: String,
@@ -933,6 +937,13 @@ pub fn run() -> Result<()> {
                 let r = susfsd::add_sus_map(&path);
                 if r.is_ok() {
                     let _ = susfs_config::append_sus_map(&path);
+                }
+                r
+            }
+            SusfsAction::AddSusMount { path } => {
+                let r = susfsd::add_sus_mount(&path);
+                if r.is_ok() {
+                    let _ = susfs_config::append_sus_mount(&path);
                 }
                 r
             }
