@@ -12,6 +12,8 @@
 #include "manager/manager_observer.h"
 #include "manager/throne_tracker.h"
 
+extern void ksu_avc_spoof_late_init(void);
+
 #ifdef CONFIG_KSU_SUSFS
 #include <linux/susfs.h>
 extern void susfs_restore_properties(void);
