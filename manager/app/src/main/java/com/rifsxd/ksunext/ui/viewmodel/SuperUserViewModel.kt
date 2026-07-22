@@ -146,32 +146,5 @@ class SuperUserViewModel : ViewModel() {
             }
         }
     }
-                    Log.i(TAG, "all packages: ${allPkgs.size}")
-
-                    val result = mutableListOf<AppInfo>()
-                    for (pkg in allPkgs) {
-                        try {
-                            val pkgInfo = pm.getPackageInfo(pkg, 0)
-                            val appInfo = pkgInfo.applicationInfo ?: continue
-                            val uid = appInfo.uid
-                            val profile = Natives.getAppProfile(pkg, uid)
-                            result.add(AppInfo(
-                                label = appInfo.loadLabel(pm).toString(),
-                                packageInfo = pkgInfo,
-                                profile = profile,
-                            ))
-                        } catch (_: Exception) { /* skip */ }
-                    }
-
-                    apps = result
-                    Log.i(TAG, "load cost: ${SystemClock.elapsedRealtime() - start}")
-                    Log.i(TAG, "apps total: ${result.size} shell=${result.count { it.uid == 2000 }} bankabc=${result.any { it.packageName.contains("bankabc") }}")
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "fetchAppList failed", e)
-                isRefreshing = false
-            }
-        }
-    }
 }
 
