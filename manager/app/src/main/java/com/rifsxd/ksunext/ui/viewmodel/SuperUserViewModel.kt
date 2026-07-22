@@ -124,21 +124,24 @@ class SuperUserViewModel : ViewModel() {
                     val pm = ksuApp.packageManager
                     val start = SystemClock.elapsedRealtime()
 
-                    // 用 shell 命令获取完整包列表（Java API 在 ksu 域下受限）
-                    val proc = Runtime.getRuntime().exec("pm list packages -f")
-                    val output = proc.inputStream.bufferedReader().readText()
-                    proc.waitFor()
-
-                    val lines = output.lines().filter { it.startsWith("package:") }
-                    Log.i(TAG, "shell packages: ${lines.size}")
+                    // 读取 /data/system/packages.list 获取完整包列表
+                    // （Java PackageManager.getInstalledPackages() 在 ksu 域下受限）
+                    val pkgListFile = java.io.File("/data/system/packages.list")
+                    val allPkgs = if (pkgListFile.canRead()) {
+                        pkgListFile.readLines().map { it.substringBefore(' ').trim() }.filter { it.isNotBlank() }
+                    } else {
+                        // fallback: 使用 shell 命令
+                        val proc = Runtime.getRuntime().exec("pm list packages -f")
+                        val output = proc.inputStream.bufferedReader().readText()
+                        proc.waitFor()
+                        output.lines().filter { it.startsWith("package:") }.map {
+                            it.substringAfterLast('=').trim()
+                        }.filter { it.isNotBlank() }
+                    }
+                    Log.i(TAG, "all packages: ${allPkgs.size}")
 
                     val result = mutableListOf<AppInfo>()
-                    for (line in lines) {
-                        val eq = line.lastIndexOf('=')
-                        if (eq < 0) continue
-                        val pkg = line.substring(eq + 1).trim()
-                        if (pkg.isBlank()) continue
-
+                    for (pkg in allPkgs) {
                         try {
                             val pkgInfo = pm.getPackageInfo(pkg, 0)
                             val appInfo = pkgInfo.applicationInfo ?: continue
@@ -154,7 +157,7 @@ class SuperUserViewModel : ViewModel() {
 
                     apps = result
                     Log.i(TAG, "load cost: ${SystemClock.elapsedRealtime() - start}")
-                    Log.i(TAG, "apps total: ${apps.size} shell=${result.count { it.uid == 2000 }} bankabc=${result.any { it.packageName.contains("bankabc") }}")
+                    Log.i(TAG, "apps total: ${result.size} shell=${result.count { it.uid == 2000 }} bankabc=${result.any { it.packageName.contains("bankabc") }}")
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "fetchAppList failed", e)
