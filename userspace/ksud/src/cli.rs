@@ -7,7 +7,7 @@ use log::{LevelFilter, info};
 
 use crate::boot_patch::{BootPatchArgs, BootRestoreArgs};
 use crate::module::regenerate_preinit_rc;
-use crate::{apk_sign, assets, debug, defs, ksu_uapi, init_event, ksucalls, module, module_config, sulog, susfsd, utils};
+use crate::{apk_sign, assets, debug, defs, ksu_uapi, init_event, ksucalls, module, module_config, sulog, susfsd, susfs_config, utils};
 
 /// KernelSU Next userspace cli
 #[derive(Parser, Debug)]
@@ -613,6 +613,9 @@ pub fn run() -> Result<()> {
         crate::resetprop::resetprop_main(&all_args)
     }
 
+    // 新启动后首次执行 ksud → 恢复 SUSFS 配置
+    susfs_config::restore_if_needed();
+
     let cli = Args::parse();
 
     log::info!("command: {:?}", cli.command);
@@ -888,25 +891,58 @@ pub fn run() -> Result<()> {
             SusfsAction::Version => susfsd::show_version(),
             SusfsAction::Variant => susfsd::show_variant(),
             SusfsAction::Features => susfsd::show_features(false),
-            SusfsAction::SetUname { release, version } => susfsd::set_uname(&release, &version),
+            SusfsAction::SetUname { release, version } => {
+                let r = susfsd::set_uname(&release, &version);
+                if r.is_ok() {
+                    let _ = susfs_config::set_uname(&release, &version);
+                }
+                r
+            }
             SusfsAction::EnableLog { enabled } => {
                 let v = enabled.parse::<u32>().map_err(|_| anyhow::anyhow!("invalid value, expected 0 or 1"))?;
-                susfsd::enable_log(v != 0)
+                let enabled_bool = v != 0;
+                let r = susfsd::enable_log(enabled_bool);
+                if r.is_ok() {
+                    let _ = susfs_config::set_toggle(|c| c.enable_log = enabled_bool);
+                }
+                r
             }
             SusfsAction::EnableAvcLogSpoofing { enabled } => {
                 let v = enabled.parse::<u32>().map_err(|_| anyhow::anyhow!("invalid value, expected 0 or 1"))?;
-                susfsd::enable_avc_log_spoofing(v != 0)
+                let enabled_bool = v != 0;
+                let r = susfsd::enable_avc_log_spoofing(enabled_bool);
+                if r.is_ok() {
+                    let _ = susfs_config::set_toggle(|c| c.enable_avc_log_spoofing = enabled_bool);
+                }
+                r
             }
             SusfsAction::HideSusMntsForNonSuProcs { enabled } => {
                 let v = enabled.parse::<u32>().map_err(|_| anyhow::anyhow!("invalid value, expected 0 or 1"))?;
-                susfsd::hide_sus_mnts_for_non_su_procs(v != 0)
+                let enabled_bool = v != 0;
+                let r = susfsd::hide_sus_mnts_for_non_su_procs(enabled_bool);
+                if r.is_ok() {
+                    let _ = susfs_config::set_toggle(|c| c.hide_sus_mnts = enabled_bool);
+                }
+                r
             }
             SusfsAction::AddOpenRedirect { target, redirected, uid_scheme } => {
                 let scheme = uid_scheme.parse::<u32>().map_err(|_| anyhow::anyhow!("invalid uid_scheme"))?;
                 susfsd::add_open_redirect(&target, &redirected, scheme)
             }
-            SusfsAction::AddSusMap { path } => susfsd::add_sus_map(&path),
-            SusfsAction::AddSusPath { path } => susfsd::add_sus_path(&path),
+            SusfsAction::AddSusMap { path } => {
+                let r = susfsd::add_sus_map(&path);
+                if r.is_ok() {
+                    let _ = susfs_config::append_sus_map(&path);
+                }
+                r
+            }
+            SusfsAction::AddSusPath { path } => {
+                let r = susfsd::add_sus_path(&path);
+                if r.is_ok() {
+                    let _ = susfs_config::append_sus_path(&path);
+                }
+                r
+            }
             SusfsAction::AddSusPathLoop { path } => susfsd::add_sus_path_loop(&path),
             SusfsAction::AddSusKstat { path } => susfsd::add_sus_kstat(&path),
             SusfsAction::UpdateSusKstat { path } => susfsd::update_sus_kstat(&path),
