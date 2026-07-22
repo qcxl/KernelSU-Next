@@ -4,6 +4,7 @@
 //! 重启后首次执行任何 ksud 命令时自动恢复。
 
 use std::path::Path;
+use std::collections::HashMap;
 use anyhow::{Result, Context};
 use const_format::concatcp;
 use serde::{Serialize, Deserialize};
@@ -23,6 +24,10 @@ pub struct SusfsConfig {
     pub enable_log: bool,
     pub enable_avc_log_spoofing: bool,
     pub hide_sus_mnts: bool,
+    #[serde(default)]
+    pub set_props: HashMap<String, String>,
+    #[serde(default)]
+    pub delete_props: Vec<String>,
 }
 
 const CONFIG_PATH: &str = concatcp!(crate::defs::ADB_DIR, "ksu/susfs_config.json");
@@ -64,13 +69,32 @@ fn default_config() -> SusfsConfig {
             "/system/bin/su".to_string(),
             "/odm/bin/su".to_string(),
             "/data/adb/ksu/su".to_string(),
+            "/system/addon.d".to_string(),
         ],
         sus_maps: vec!["/data/adb/".to_string()],
         sus_mounts: vec!["/vendor".to_string(), "/odm".to_string()],
         enable_log: false,
         enable_avc_log_spoofing: true,
         hide_sus_mnts: true,
-        ..Default::default()
+        set_props: HashMap::from([
+            ("ro.build.type".into(), "user".into()),
+            ("ro.build.flavor".into(), "OnePlus8T-user".into()),
+            ("ro.build.display.id".into(), "RKQ1.211119.001".into()),
+            ("ro.debuggable".into(), "0".into()),
+            ("ro.build.user".into(), "jenkins".into()),
+            ("ro.build.host".into(), "rd-build-193".into()),
+        ]),
+        delete_props: vec![
+            "ro.lineage.version".into(),
+            "ro.lineage.build.version".into(),
+            "ro.lineage.build.version.plat.rev".into(),
+            "ro.lineage.build.version.plat.sdk".into(),
+            "ro.lineage.device".into(),
+            "ro.lineage.display.version".into(),
+            "ro.lineage.releasetype".into(),
+            "ro.lineagelegal.url".into(),
+            "ro.modversion".into(),
+        ],
     }
 }
 
@@ -137,6 +161,14 @@ pub fn apply(config: &SusfsConfig) {
     if config.hide_sus_mnts {
         let _ = susfsd::hide_sus_mnts_for_non_su_procs(true);
     }
+
+    // resetprop：先设置后删除，避免冲突
+    for (key, value) in &config.set_props {
+        let _ = susfsd::set_prop(key, value);
+    }
+    for key in &config.delete_props {
+        let _ = susfsd::delete_prop(key);
+    }
 }
 
 /// 在 CLI 入口处调用：新启动则恢复配置
@@ -151,7 +183,9 @@ pub fn restore_if_needed() {
                 || !config.uname_release.is_empty()
                 || config.enable_log
                 || config.enable_avc_log_spoofing
-                || config.hide_sus_mnts;
+                || config.hide_sus_mnts
+                || !config.set_props.is_empty()
+                || !config.delete_props.is_empty();
             if has_rules {
                 log::info!("restoring SUSFS config from {}", CONFIG_PATH);
                 apply(&config);

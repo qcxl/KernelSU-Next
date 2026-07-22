@@ -379,3 +379,29 @@ fn check_unsupported(err: i32, cmd: u64) -> Result<()> {
     }
     Ok(())
 }
+
+/// 设置系统属性（通过 resetprop）
+pub fn set_prop(key: &str, value: &str) -> Result<()> {
+    let output = std::process::Command::new("/data/adb/ksu/bin/resetprop")
+        .args([key, value])
+        .output()
+        .map_err(|e| anyhow!("resetprop exec failed: {e}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!("resetprop {}={} failed: {}", key, value, stderr.trim());
+    }
+    Ok(())
+}
+
+/// 删除系统属性
+pub fn delete_prop(key: &str) -> Result<()> {
+    let output = std::process::Command::new("/data/adb/ksu/bin/resetprop")
+        .args(["--delete", key])
+        .output()
+        .map_err(|e| anyhow!("resetprop --delete exec failed: {e}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!("resetprop --delete {} failed: {}", key, stderr.trim());
+    }
+    Ok(())
+}
