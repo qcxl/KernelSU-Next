@@ -55,11 +55,30 @@ fn mark_boot_restored() {
     }
 }
 
-/// 加载配置
+/// 内置默认配置（格式 /data 后也自动生效）
+fn default_config() -> SusfsConfig {
+    SusfsConfig {
+        uname_release: "4.19.304".to_string(),
+        uname_version: "Default/4.19".to_string(),
+        sus_paths: vec![
+            "/system/bin/su".to_string(),
+            "/odm/bin/su".to_string(),
+            "/data/adb/ksu/su".to_string(),
+        ],
+        sus_maps: vec!["/data/adb/".to_string()],
+        sus_mounts: vec!["/vendor".to_string(), "/odm".to_string()],
+        enable_log: false,
+        enable_avc_log_spoofing: true,
+        hide_sus_mnts: true,
+        ..Default::default()
+    }
+}
+
+/// 加载配置，文件不存在时返回内置默认值（而非空配置）
 pub fn load() -> Result<SusfsConfig> {
     let path = Path::new(CONFIG_PATH);
     if !path.exists() {
-        return Ok(SusfsConfig::default());
+        return Ok(default_config());
     }
     let data = std::fs::read_to_string(path).context("read susfs config")?;
     serde_json::from_str(&data).context("parse susfs config")
