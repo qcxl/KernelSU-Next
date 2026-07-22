@@ -113,7 +113,7 @@ static void susfs_restore_boot(void)
 			NULL,
 		};
 		for (i = 0; maps[i]; i++)
-			susfs_add_sus_map_kernel(maps[i]);
+			susfs_mark_inode_sus_map(maps[i]);
 	}
 	{
 		static const char * const mounts[] = {
@@ -146,5 +146,23 @@ static void susfs_restore_boot(void)
 int susfs_is_boot_restored(void)
 {
 	return susfs_boot_restored ? 1 : 0;
+}
+
+/* Mark an inode as SUS_MAP (kernel-safe, no __user) */
+static int susfs_mark_inode_sus_map(const char *path)
+{
+	struct path p;
+	struct inode *inode;
+	int err;
+
+	err = kern_path(path, 0, &p);
+	if (err)
+		return err;
+	inode = d_inode(p.dentry);
+	spin_lock(&inode->i_lock);
+	inode->i_state |= INODE_STATE_SUS_MAP;
+	spin_unlock(&inode->i_lock);
+	path_put(&p);
+	return 0;
 }
 #endif /* CONFIG_KSU_SUSFS */
