@@ -155,6 +155,10 @@ pub fn restore_if_needed() {
             if has_rules {
                 log::info!("restoring SUSFS config from {}", CONFIG_PATH);
                 apply(&config);
+                // 如果配置文件不存在（首次启动/格式 /data），保存内置默认值到磁盘
+                if !Path::new(CONFIG_PATH).exists() {
+                    let _ = save(&config);
+                }
             }
         }
         Err(e) => {
