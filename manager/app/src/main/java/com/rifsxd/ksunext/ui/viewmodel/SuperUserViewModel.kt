@@ -95,7 +95,7 @@ class SuperUserViewModel : ViewModel() {
     }
 
     val appList by derivedStateOf {
-        val mapped = sortedList.map { app ->
+        sortedList.map { app ->
             profileOverrides[app.packageName]?.let { app.copy(profile = it) } ?: app
         }.filter {
             it.label.contains(search, true) || it.packageName.contains(
@@ -107,14 +107,6 @@ class SuperUserViewModel : ViewModel() {
             it.uid == 2000 // Always show shell
                     || showSystemApps || it.packageInfo.applicationInfo!!.flags.and(ApplicationInfo.FLAG_SYSTEM) == 0
         }
-        // 调试：记录过滤结果
-        val total = sortedList.size
-        val filtered = mapped.size
-        val hasBankabc = mapped.any { it.packageName.contains("bankabc") }
-        val hasDetector = mapped.any { it.packageName.contains("detector") }
-        val hasShell = mapped.any { it.uid == 2000 }
-        Log.i(TAG, "appList: total=$total filtered=$filtered shell=$hasShell bankabc=$hasBankabc detector=$hasDetector showSystem=$showSystemApps")
-        mapped
     }
 
     fun updateAppProfile(packageName: String, newProfile: Natives.Profile) {
@@ -132,31 +124,37 @@ class SuperUserViewModel : ViewModel() {
                     val pm = ksuApp.packageManager
                     val start = SystemClock.elapsedRealtime()
 
-                    val allPackages = pm.getInstalledPackages(0)
-                    Log.i(TAG, "allPackages count: ${allPackages.size}")
+                    // 用 shell 命令获取完整包列表（Java API 在 ksu 域下受限）
+                    val proc = Runtime.getRuntime().exec("pm list packages -f")
+                    val output = proc.inputStream.bufferedReader().readText()
+                    proc.waitFor()
 
-                    apps = allPackages.map {
-                        val appInfo = it.applicationInfo
-                        val uid = appInfo!!.uid
-                        val flags = appInfo.flags
-                        val isSystem = (flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                        val packageName = it.packageName
+                    val lines = output.lines().filter { it.startsWith("package:") }
+                    Log.i(TAG, "shell packages: ${lines.size}")
 
-                        // 对目标 App 打印调试日志
-                        if (packageName.contains("bankabc") || packageName.contains("detector") || packageName.contains("shell")
-                            || packageName.contains("mahoshojo") || packageName.contains("ksunext")) {
-                            Log.i(TAG, "DEBUG app=$packageName uid=$uid flags=$flags FLAG_SYSTEM=${ApplicationInfo.FLAG_SYSTEM} isSystem=$isSystem")
-                        }
+                    val result = mutableListOf<AppInfo>()
+                    for (line in lines) {
+                        val eq = line.lastIndexOf('=')
+                        if (eq < 0) continue
+                        val pkg = line.substring(eq + 1).trim()
+                        if (pkg.isBlank()) continue
 
-                        val profile = Natives.getAppProfile(it.packageName, uid)
-                        AppInfo(
-                            label = appInfo.loadLabel(pm).toString(),
-                            packageInfo = it,
-                            profile = profile,
-                        )
+                        try {
+                            val pkgInfo = pm.getPackageInfo(pkg, 0)
+                            val appInfo = pkgInfo.applicationInfo ?: continue
+                            val uid = appInfo.uid
+                            val profile = Natives.getAppProfile(pkg, uid)
+                            result.add(AppInfo(
+                                label = appInfo.loadLabel(pm).toString(),
+                                packageInfo = pkgInfo,
+                                profile = profile,
+                            ))
+                        } catch (_: Exception) { /* skip */ }
                     }
+
+                    apps = result
                     Log.i(TAG, "load cost: ${SystemClock.elapsedRealtime() - start}")
-                    Log.i(TAG, "apps total: ${apps.size}")
+                    Log.i(TAG, "apps total: ${apps.size} shell=${result.count { it.uid == 2000 }} bankabc=${result.any { it.packageName.contains("bankabc") }}")
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "fetchAppList failed", e)
