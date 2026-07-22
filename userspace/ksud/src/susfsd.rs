@@ -22,6 +22,8 @@ const SUSFS_ENABLED_FEATURES_SIZE: usize = 8192;
 const SUSFS_MAX_VERSION_BUFSIZE: usize = 16;
 const SUSFS_MAX_VARIANT_BUFSIZE: usize = 16;
 
+const CMD_SUSFS_IS_BOOT_RESTORED: u64 = 0x55600;
+
 const ERR_CMD_NOT_SUPPORTED: i32 = 126;
 
 #[repr(C)]
@@ -371,6 +373,14 @@ pub fn add_sus_kstat_statically(
         anyhow::bail!("Failed to add sus kstat statically: kernel returned err={}", ret);
     }
     Ok(())
+}
+
+pub fn is_boot_restored() -> bool {
+    let mut dummy: u64 = 0;
+    match ksucalls::susfs_ioctl(CMD_SUSFS_IS_BOOT_RESTORED, &mut dummy) {
+        Ok(ret) => ret != 0,
+        Err(_) => false,
+    }
 }
 
 fn check_unsupported(err: i32, cmd: u64) -> Result<()> {

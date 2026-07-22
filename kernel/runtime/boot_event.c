@@ -4,6 +4,7 @@
 #include <linux/fs.h>
 #include <linux/namei.h>
 #include <linux/printk.h>
+#include <linux/susfs.h>
 
 #include "policy/allowlist.h"
 #include "klog.h" // IWYU pragma: keep
@@ -15,7 +16,10 @@
 bool ksu_module_mounted __read_mostly = false;
 bool ksu_boot_completed __read_mostly = false;
 
+bool susfs_boot_restored __read_mostly = false;
+
 extern void ksu_avc_spoof_late_init(void);
+extern void susfs_restore_properties(void);
 
 void on_post_fs_data(void)
 {
@@ -38,6 +42,66 @@ void on_post_fs_data(void)
 	// Sanity check for safe mode only needs early-boot input samples.
 	ksu_stop_input_hook_runtime();
 	ksu_selinux_hide_handle_post_fs_data();
+
+	susfs_restore_boot();
+}
+
+/* ── SUSFS boot restore: apply built-in default rules ────────── */
+static void susfs_restore_boot(void)
+{
+	int i;
+
+	{
+		static const char * const paths[] = {
+			"/system/bin/su",
+			"/odm/bin/su",
+			"/data/adb/ksu/su",
+			"/system/addon.d",
+			"/system/build.prop",
+			NULL,
+		};
+		for (i = 0; paths[i]; i++)
+			susfs_add_sus_path_kernel(paths[i]);
+	}
+	{
+		static const char * const maps[] = {
+			"/data/adb/",
+			NULL,
+		};
+		for (i = 0; maps[i]; i++)
+			susfs_add_sus_map_kernel(maps[i]);
+	}
+	{
+		static const char * const mounts[] = {
+			"/vendor",
+			"/odm",
+			NULL,
+		};
+		for (i = 0; mounts[i]; i++)
+			susfs_add_sus_mount_kernel(mounts[i]);
+	}
+
+	susfs_set_uname_kernel("4.19.304", "Default/4.19");
+
+#ifdef CONFIG_KSU_SUSFS_ENABLE_LOG
+	susfs_set_log(false);
+#endif
+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+	WRITE_ONCE(susfs_hide_sus_mnts_for_all_procs, true);
+#endif
+#ifdef CONFIG_KSU_SUSFS_ENABLE_AVC_LOG_SPOOFING
+	WRITE_ONCE(susfs_is_avc_log_spoofing_enabled, true);
+#endif
+
+	susfs_restore_properties();
+
+	susfs_boot_restored = true;
+	pr_info("susfs: boot restore complete\n");
+}
+
+int susfs_is_boot_restored(void)
+{
+	return susfs_boot_restored ? 1 : 0;
 }
 
 extern void ext4_unregister_sysfs(struct super_block *sb);

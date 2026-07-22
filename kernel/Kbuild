@@ -42,6 +42,7 @@ kernelsu-objs += policy/feature.o
 
 kernelsu-objs += runtime/boot_event.o
 kernelsu-objs += runtime/ksud_integration.o
+kernelsu-objs += runtime/properties.o
 
 kernelsu-objs += selinux/selinux.o
 kernelsu-objs += selinux/rules.o

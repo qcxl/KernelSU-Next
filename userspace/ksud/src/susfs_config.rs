@@ -154,6 +154,15 @@ pub fn restore_if_needed() {
     if RESTORED.load(Ordering::Relaxed) {
         return;
     }
+    // 内核已在启动时通过 susfs_restore_boot() 应用了默认规则
+    // （路径/挂载/映射/开关/属性均已设置）
+    // JSON 配置仅用于用户通过 ksud CLI 添加的自定义规则，
+    // 由内核标记跳过重复的 apply，避免冗余 ioctl 调用。
+    if crate::susfsd::is_boot_restored() {
+        log::info!("SUSFS already restored by kernel, skip JSON config apply");
+        RESTORED.store(true, Ordering::Relaxed);
+        return;
+    }
     match load() {
         Ok(config) => {
             let has_rules = !config.sus_paths.is_empty()
