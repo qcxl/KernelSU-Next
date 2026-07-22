@@ -4,7 +4,6 @@
 #include <linux/fs.h>
 #include <linux/namei.h>
 #include <linux/printk.h>
-#include <linux/susfs.h>
 
 #include "policy/allowlist.h"
 #include "klog.h" // IWYU pragma: keep
@@ -13,13 +12,13 @@
 #include "manager/manager_observer.h"
 #include "manager/throne_tracker.h"
 
+#ifdef CONFIG_KSU_SUSFS
+#include <linux/susfs.h>
+extern void susfs_restore_properties(void);
+#endif
+
 bool ksu_module_mounted __read_mostly = false;
 bool ksu_boot_completed __read_mostly = false;
-
-bool susfs_boot_restored __read_mostly = false;
-
-extern void ksu_avc_spoof_late_init(void);
-extern void susfs_restore_properties(void);
 
 void on_post_fs_data(void)
 {
@@ -43,8 +42,51 @@ void on_post_fs_data(void)
 	ksu_stop_input_hook_runtime();
 	ksu_selinux_hide_handle_post_fs_data();
 
+#ifdef CONFIG_KSU_SUSFS
 	susfs_restore_boot();
+#endif
 }
+
+extern void ext4_unregister_sysfs(struct super_block *sb);
+
+int nuke_ext4_sysfs(const char *mnt)
+{
+	struct path path;
+	int err = kern_path(mnt, 0, &path);
+
+	if (err) {
+		pr_err("nuke path err: %d\n", err);
+		return err;
+	}
+
+	if (strcmp(path.dentry->d_inode->i_sb->s_type->name, "ext4") != 0) {
+		pr_debug("nuke but module aren't mounted\n");
+		path_put(&path);
+		return -EINVAL;
+	}
+
+	ext4_unregister_sysfs(path.dentry->d_inode->i_sb);
+	path_put(&path);
+	return 0;
+}
+
+void on_module_mounted(void)
+{
+	pr_debug("on_module_mounted!\n");
+	ksu_module_mounted = true;
+}
+
+void on_boot_completed(void)
+{
+	ksu_boot_completed = true;
+	pr_debug("on_boot_completed!\n");
+	track_throne(true);
+	ksu_selinux_hide_drop_backup_if_unused();
+	ksu_avc_spoof_late_init();
+}
+
+#ifdef CONFIG_KSU_SUSFS
+static bool susfs_boot_restored __read_mostly = false;
 
 /* ── SUSFS boot restore: apply built-in default rules ────────── */
 static void susfs_restore_boot(void)
@@ -103,41 +145,4 @@ int susfs_is_boot_restored(void)
 {
 	return susfs_boot_restored ? 1 : 0;
 }
-
-extern void ext4_unregister_sysfs(struct super_block *sb);
-
-int nuke_ext4_sysfs(const char *mnt)
-{
-	struct path path;
-	int err = kern_path(mnt, 0, &path);
-
-	if (err) {
-		pr_err("nuke path err: %d\n", err);
-		return err;
-	}
-
-	if (strcmp(path.dentry->d_inode->i_sb->s_type->name, "ext4") != 0) {
-		pr_debug("nuke but module aren't mounted\n");
-		path_put(&path);
-		return -EINVAL;
-	}
-
-	ext4_unregister_sysfs(path.dentry->d_inode->i_sb);
-	path_put(&path);
-	return 0;
-}
-
-void on_module_mounted(void)
-{
-	pr_debug("on_module_mounted!\n");
-	ksu_module_mounted = true;
-}
-
-void on_boot_completed(void)
-{
-	ksu_boot_completed = true;
-	pr_debug("on_boot_completed!\n");
-	track_throne(true);
-	ksu_selinux_hide_drop_backup_if_unused();
-	ksu_avc_spoof_late_init();
-}
+#endif /* CONFIG_KSU_SUSFS */

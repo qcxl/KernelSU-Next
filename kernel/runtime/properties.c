@@ -16,6 +16,7 @@
 #include <linux/pid.h>
 #include <linux/sched.h>
 #include <linux/sched/task.h>
+#include <linux/slab.h>
 #include <linux/printk.h>
 #include <linux/string.h>
 #include <linux/uaccess.h>
