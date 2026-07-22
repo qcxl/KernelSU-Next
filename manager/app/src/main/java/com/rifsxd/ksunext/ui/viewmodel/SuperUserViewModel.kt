@@ -124,13 +124,20 @@ class SuperUserViewModel : ViewModel() {
                     val pm = ksuApp.packageManager
                     val start = SystemClock.elapsedRealtime()
 
-                    // 读取 /data/system/packages.list 获取完整包列表
-                    // （Java PackageManager.getInstalledPackages() 在 ksu 域下受限）
-                    val pkgListFile = java.io.File("/data/system/packages.list")
-                    val allPkgs = if (pkgListFile.canRead()) {
-                        pkgListFile.readLines().map { it.substringBefore(' ').trim() }.filter { it.isNotBlank() }
-                    } else {
-                        // fallback: 使用 shell 命令
+                    // 通过 su 获取完整包列表（Java API 在 ksu 域下只返回~90个）
+                    val allPkgs = try {
+                        val su = Runtime.getRuntime().exec("su")
+                        val out = su.outputStream
+                        out.write("pm list packages -f\n".toByteArray())
+                        out.write("exit\n".toByteArray())
+                        out.flush()
+                        val output = su.inputStream.bufferedReader().readText()
+                        su.waitFor()
+                        output.lines().filter { it.startsWith("package:") }.map {
+                            it.substringAfterLast('=').trim()
+                        }.filter { it.isNotBlank() }
+                    } catch (_: Exception) {
+                        // fallback: 直接 shell（受限但部分可用）
                         val proc = Runtime.getRuntime().exec("pm list packages -f")
                         val output = proc.inputStream.bufferedReader().readText()
                         proc.waitFor()
