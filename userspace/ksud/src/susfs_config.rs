@@ -70,6 +70,7 @@ fn default_config() -> SusfsConfig {
             "/odm/bin/su".to_string(),
             "/data/adb/ksu/su".to_string(),
             "/system/addon.d".to_string(),
+            "/system/build.prop".to_string(),
         ],
         sus_path_loops: vec![],
         sus_maps: vec!["/data/adb/".to_string()],
