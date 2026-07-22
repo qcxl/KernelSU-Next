@@ -124,26 +124,97 @@ class SuperUserViewModel : ViewModel() {
                     val pm = ksuApp.packageManager
                     val start = SystemClock.elapsedRealtime()
 
-                    // 通过 su 获取完整包列表（Java API 在 ksu 域下只返回~90个）
+                    // 通过 su 获取完整包列表和 uid/flags（Java API 受 uid=10190 限制）
                     val allPkgs = try {
                         val su = Runtime.getRuntime().exec("su")
                         val out = su.outputStream
                         out.write("pm list packages -f\n".toByteArray())
+                        out.write("cat /data/system/packages.list\n".toByteArray())
                         out.write("exit\n".toByteArray())
                         out.flush()
                         val output = su.inputStream.bufferedReader().readText()
                         su.waitFor()
-                        output.lines().filter { it.startsWith("package:") }.map {
-                            it.substringAfterLast('=').trim()
-                        }.filter { it.isNotBlank() }
+
+                        // 解析 pm list packages -f 输出
+                        val pmLines = output.lines().filter { it.startsWith("package:") }
+                        val pkgToPath = mutableMapOf<String, String>()
+                        val pkgNames = mutableListOf<String>()
+                        for (line in pmLines) {
+                            val eq = line.lastIndexOf('=')
+                            if (eq < 0) continue
+                            val path = line.substring("package:".length, eq)
+                            val name = line.substring(eq + 1).trim()
+                            if (name.isNotBlank()) {
+                                pkgToPath[name] = path
+                                pkgNames.add(name)
+                            }
+                        }
+
+                        // 解析 packages.list 输出获取 uid 和 flags
+                        val listLines = output.lineSequence().dropWhile { it.startsWith("package:") }
+                            .filter { it.isNotBlank() && !it.startsWith("exit") }
+                            .toList()
+                        val uidMap = mutableMapOf<String, Int>()
+                        val flagsMap = mutableMapOf<String, Int>()
+                        for (line in listLines) {
+                            val parts = line.split(' ')
+                            if (parts.size >= 8) {
+                                val pkg = parts[0]
+                                try {
+                                    uidMap[pkg] = parts[1].toInt()
+                                    flagsMap[pkg] = parts[7].toInt()
+                                } catch (_: NumberFormatException) {}
+                            }
+                        }
+
+                        // 构建 AppInfo 列表
+                        val result = mutableListOf<AppInfo>()
+                        for (pkg in pkgNames) {
+                            try {
+                                val apkPath = pkgToPath[pkg]
+                                val uid = uidMap[pkg] ?: continue
+                                val flags = flagsMap[pkg] ?: 0
+
+                                // 用 PackageInfo 包装基本信息
+                                val pkgInfo = PackageInfo().apply {
+                                    packageName = pkg
+                                    applicationInfo = ApplicationInfo().apply {
+                                        this.packageName = pkg
+                                        this.uid = uid
+                                        this.flags = flags
+                                    }
+                                }
+
+                                // 获取 label：优先从 PackageManager，失败则从 APK archive
+                                val appInfo = try {
+                                    pm.getApplicationInfo(pkg, 0)
+                                } catch (_: Exception) {
+                                    if (apkPath != null) try {
+                                        pm.getPackageArchiveInfo(apkPath, 0)?.applicationInfo
+                                    } catch (_: Exception) { null } else null
+                                }
+
+                                val label = if (appInfo != null) {
+                                    appInfo.loadLabel(pm).toString()
+                                } else {
+                                    pkg // 兜底：包名
+                                }
+
+                                if (appInfo != null) {
+                                    pkgInfo.applicationInfo = appInfo
+                                }
+
+                                val profile = Natives.getAppProfile(pkg, uid)
+                                result.add(AppInfo(
+                                    label = label,
+                                    packageInfo = pkgInfo,
+                                    profile = profile,
+                                ))
+                            } catch (_: Exception) { /* skip */ }
+                        }
+                        result
                     } catch (_: Exception) {
-                        // fallback: 直接 shell（受限但部分可用）
-                        val proc = Runtime.getRuntime().exec("pm list packages -f")
-                        val output = proc.inputStream.bufferedReader().readText()
-                        proc.waitFor()
-                        output.lines().filter { it.startsWith("package:") }.map {
-                            it.substringAfterLast('=').trim()
-                        }.filter { it.isNotBlank() }
+                        mutableListOf()
                     }
                     Log.i(TAG, "all packages: ${allPkgs.size}")
 
