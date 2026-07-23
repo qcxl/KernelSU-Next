@@ -120,42 +120,29 @@ static uint32_t prop_trie_find(uint8_t *data, const char *key)
 }
 
 /* ── Find the property area file ────────────────────────────── */
-/* Locate init's property area shared memory by scanning /proc/1/fd/
- * for a file whose path contains "__properties__". */
+/* Open the default property context file directly.
+ * All our target properties (ro.build.*, ro.debuggable, ro.lineage.*)
+ * fall under the default_prop SELinux context (plat_property_contexts
+ * wildcard rule: "* u:object_r:default_prop:s0"). */
 static struct file *find_prop_area_file(void)
 {
-	struct task_struct *tsk;
-	struct file *result = NULL;
-	int fd;
+	static const char *paths[] = {
+		"/dev/__properties__/u:object_r:default_prop:s0",
+		NULL,
+	};
+	struct file *fp;
+	int i;
 
-	tsk = get_pid_task(find_get_pid(1), PIDTYPE_PID);
-	if (!tsk)
-		return NULL;
-
-	task_lock(tsk);
-	if (tsk->files) {
-		spin_lock(&tsk->files->file_lock);
-		for (fd = 0; fd < files_fdtable(tsk->files)->max_fds; fd++) {
-			struct file *f = files_fdtable(tsk->files)->fd[fd];
-			char path_buf[256];
-			char *path;
-
-			if (!f)
-				continue;
-			path = d_path(&f->f_path, path_buf,
-				      sizeof(path_buf));
-			if (!IS_ERR(path) &&
-			    strstr(path, "__properties__")) {
-				get_file(f);
-				result = f;
-				break;
-			}
-		}
-		spin_unlock(&tsk->files->file_lock);
+	for (i = 0; paths[i]; i++) {
+		fp = filp_open(paths[i], O_RDWR, 0);
+		if (!IS_ERR(fp))
+			return fp;
+		pr_debug("susfs: property area '%s' open failed (%ld)\n",
+			 paths[i], PTR_ERR(fp));
 	}
-	task_unlock(tsk);
-	put_task_struct(tsk);
-	return result;
+
+	pr_warn("susfs: no property area found\n");
+	return NULL;
 }
 
 /* ── Property set / delete ──────────────────────────────────── */
