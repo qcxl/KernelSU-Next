@@ -162,11 +162,17 @@ static struct file *try_context(const char *context, const char *key,
 	return fp;
 }
 
-/* Context files to try, in order. See plat_property_contexts. */
+/* Context files to try, in order. Mapped from plat_property_contexts
+ * on LineageOS 20 (verified at runtime with dd + strings + O_RDWR test).
+ *
+ * build_prop:           ro.build.type, ro.build.flavor, ro.build.display.id,
+ *                       ro.build.user, ro.build.host
+ * userdebug_or_eng_prop: ro.debuggable
+ * default_prop:         ro.lineage.* (×8), ro.modversion (wildcard rule: *) */
 static const char *prop_contexts[] = {
-	"default_prop",	/* wildcard *, covers ro.lineage.*, ro.modversion, ro.debuggable */
-	"build_prop",	/* /system/build.prop: ro.build.type, ro.build.flavor, etc. */
-	"system_prop",	/* ro.runtime.*, persist.sys.*, sys.* */
+	"build_prop",
+	"userdebug_or_eng_prop",
+	"default_prop",
 	NULL,
 };
 
