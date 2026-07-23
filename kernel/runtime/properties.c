@@ -215,21 +215,10 @@ int property_set(const char *key, const char *value)
 		kernel_write(fp, "\0", 1, &pos);
 	}
 
-	/* Bump serial to notify readers */
-	{
-		uint32_t new_serial;
-		loff_t file_off = (loff_t)PROP_AREA_HEADER_SZ + info_off;
-		loff_t pos;
-
-		memcpy(&new_serial, page + PROP_AREA_HEADER_SZ + info_off +
-		       offsetof(struct prop_info_rec, serial),
-		       sizeof(new_serial));
-		new_serial += 2;
-		pos = file_off +
-		      offsetof(struct prop_info_rec, serial);
-		kernel_write(fp, &new_serial, sizeof(new_serial), &pos);
-	}
-
+	/* Skip serial update — Hunter detects serial changes as
+	 * "Abnormal prop serial for: ...". Readers use the length
+	 * field from serial (bits 31-24) which remains valid even
+	 * when we write a shorter value (null-padded). */
 	pr_info("susfs: property_set '%s' = '%s' (context=%s)\n",
 		key, value, prop_contexts[i]);
 	ret = 0;
@@ -274,20 +263,6 @@ int property_delete(const char *key)
 		loff_t file_off = (loff_t)PROP_AREA_HEADER_SZ + info_off;
 		loff_t pos = file_off + offsetof(struct prop_info_rec, value);
 		kernel_write(fp, &nul, 1, &pos);
-	}
-
-	/* Bump serial */
-	{
-		uint32_t new_serial;
-		loff_t file_off = (loff_t)PROP_AREA_HEADER_SZ + info_off;
-		loff_t pos;
-		memcpy(&new_serial, page + PROP_AREA_HEADER_SZ + info_off +
-		       offsetof(struct prop_info_rec, serial),
-		       sizeof(new_serial));
-		new_serial += 2;
-		pos = file_off +
-		      offsetof(struct prop_info_rec, serial);
-		kernel_write(fp, &new_serial, sizeof(new_serial), &pos);
 	}
 
 	pr_info("susfs: property_delete '%s' (context=%s)\n",
