@@ -277,12 +277,15 @@ int property_delete(const char *key)
 void susfs_restore_properties(void)
 {
 	static const char * const set_props[][2] = {
-		{ "ro.build.type",        "user" },
-		{ "ro.build.flavor",      "OnePlus8T-user" },
-		{ "ro.build.display.id",  "RKQ1.211119.001" },
-		{ "ro.debuggable",        "0" },
-		{ "ro.build.user",        "jenkins" },
-		{ "ro.build.host",        "rd-build-193" },
+		{ "ro.build.type",             "user" },
+		{ "ro.build.flavor",           "OnePlus8T-user" },
+		{ "ro.build.display.id",       "RKQ1.211119.001" },
+		{ "ro.debuggable",             "0" },
+		{ "ro.build.user",             "jenkins" },
+		{ "ro.build.host",             "rd-build-193" },
+		{ "ro.boot.verifiedbootstate", "green" },
+		{ "ro.bootimage.build.type",   "user" },
+		{ "ro.boot.type",              "release" },
 		{ NULL, NULL },
 	};
 	static const char * const del_props[] = {
