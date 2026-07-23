@@ -202,26 +202,30 @@ int property_set(const char *key, const char *value)
 	if (vlen >= PROP_VALUE_MAX)
 		vlen = PROP_VALUE_MAX - 1;
 
-	/* Write new value into shared memory */
+	/* Write new value into shared memory.
+	 * info_off is relative to data[] (after 128-byte header).
+	 * Convert to file offset: hdr_sz + info_off. */
 	{
+		loff_t file_off = (loff_t)PROP_AREA_HEADER_SZ + info_off;
 		loff_t pos;
 
-		pos = (loff_t)info_off + offsetof(struct prop_info_rec, value);
+		pos = file_off + offsetof(struct prop_info_rec, value);
 		kernel_write(fp, value, vlen, &pos);
-		pos = (loff_t)info_off + offsetof(struct prop_info_rec, value) + vlen;
+		pos = file_off + offsetof(struct prop_info_rec, value) + vlen;
 		kernel_write(fp, "\0", 1, &pos);
 	}
 
 	/* Bump serial to notify readers */
 	{
 		uint32_t new_serial;
+		loff_t file_off = (loff_t)PROP_AREA_HEADER_SZ + info_off;
 		loff_t pos;
 
-		memcpy(&new_serial, page + info_off +
+		memcpy(&new_serial, page + PROP_AREA_HEADER_SZ + info_off +
 		       offsetof(struct prop_info_rec, serial),
 		       sizeof(new_serial));
 		new_serial += 2;
-		pos = (loff_t)info_off +
+		pos = file_off +
 		      offsetof(struct prop_info_rec, serial);
 		kernel_write(fp, &new_serial, sizeof(new_serial), &pos);
 	}
@@ -259,26 +263,29 @@ int property_delete(const char *key)
 	/* Zero out name first byte to mark deleted */
 	{
 		char nul = '\0';
-		loff_t pos = (loff_t)info_off + sizeof(struct prop_info_rec);
+		loff_t file_off = (loff_t)PROP_AREA_HEADER_SZ + info_off;
+		loff_t pos = file_off + sizeof(struct prop_info_rec);
 		kernel_write(fp, &nul, 1, &pos);
 	}
 
 	/* Clear value */
 	{
 		char nul = '\0';
-		loff_t pos = (loff_t)info_off + offsetof(struct prop_info_rec, value);
+		loff_t file_off = (loff_t)PROP_AREA_HEADER_SZ + info_off;
+		loff_t pos = file_off + offsetof(struct prop_info_rec, value);
 		kernel_write(fp, &nul, 1, &pos);
 	}
 
 	/* Bump serial */
 	{
 		uint32_t new_serial;
+		loff_t file_off = (loff_t)PROP_AREA_HEADER_SZ + info_off;
 		loff_t pos;
-		memcpy(&new_serial, page + info_off +
+		memcpy(&new_serial, page + PROP_AREA_HEADER_SZ + info_off +
 		       offsetof(struct prop_info_rec, serial),
 		       sizeof(new_serial));
 		new_serial += 2;
-		pos = (loff_t)info_off +
+		pos = file_off +
 		      offsetof(struct prop_info_rec, serial);
 		kernel_write(fp, &new_serial, sizeof(new_serial), &pos);
 	}
