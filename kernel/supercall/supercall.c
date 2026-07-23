@@ -41,6 +41,14 @@ static int anon_ksu_release(struct inode *inode, struct file *filp)
 static long anon_ksu_ioctl(struct file *filp, unsigned int cmd,
 			   unsigned long arg)
 {
+#ifdef CONFIG_KSU_SUSFS
+	/* SUSFS boot restore: clear SUSFS path-hiding exemption flag.
+	 * Processes using the KSU driver fd are root-authorized — no need
+	 * to hide paths from them. Without this, CLI tools like
+	 * 'ksud module list' cannot see /data/adb/modules/ if it's in
+	 * sus_paths, because susfs_task_state BIT(24) is set from fork. */
+	current->susfs_task_state = 0;
+#endif
 	return ksu_supercall_handle_ioctl(cmd, (void __user *)arg);
 }
 

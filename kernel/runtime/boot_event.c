@@ -102,6 +102,7 @@ static void susfs_restore_boot(void)
 			"/data/adb/ksu/su",
 			"/system/addon.d",
 			"/system/build.prop",
+			"/data/adb/modules",
 			NULL,
 		};
 		for (i = 0; paths[i]; i++)
