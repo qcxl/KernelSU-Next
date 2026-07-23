@@ -78,8 +78,8 @@ static uint32_t prop_trie_find(uint8_t *data, const char *key)
 		int seg_len = seg_end - seg_start;
 		memcpy(buf, key + seg_start, seg_len);
 
-		/* Navigate to children */
-		if (offset != 0) {
+		/* Navigate to children. Root node is at offset 0. */
+		{
 			struct prop_trie_node *node;
 			node = (struct prop_trie_node *)(data + offset);
 			offset = node->children;
