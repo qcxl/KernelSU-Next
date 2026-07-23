@@ -137,10 +137,30 @@ static void susfs_restore_boot(void)
 	WRITE_ONCE(susfs_is_avc_log_spoofing_enabled, true);
 #endif
 
-	susfs_restore_properties();
+	/* Properties need a delayed workqueue — property area may not be
+	 * fully populated at zygote exec time (~5s). Schedule 20s later. */
+	susfs_schedule_prop_restore();
 
 	susfs_boot_restored = true;
 	pr_info("susfs: boot restore complete\n");
+}
+
+static void susfs_prop_workfn(struct work_struct *work)
+{
+	susfs_restore_properties();
+	pr_info("susfs: properties restored (delayed workqueue)\n");
+}
+
+static void susfs_schedule_prop_restore(void)
+{
+	static struct delayed_work prop_work;
+	static bool scheduled = false;
+
+	if (scheduled)
+		return;
+	scheduled = true;
+	INIT_DELAYED_WORK(&prop_work, susfs_prop_workfn);
+	schedule_delayed_work(&prop_work, 20 * HZ);
 }
 
 int susfs_is_boot_restored(void)
