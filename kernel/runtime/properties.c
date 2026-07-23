@@ -11,11 +11,7 @@
  * Called from boot_event.c on_post_fs_data() at zygote exec time.
  */
 #include <linux/fs.h>
-#include <linux/fdtable.h>
 #include <linux/file.h>
-#include <linux/pid.h>
-#include <linux/sched.h>
-#include <linux/sched/task.h>
 #include <linux/slab.h>
 #include <linux/printk.h>
 #include <linux/string.h>
@@ -119,83 +115,102 @@ static uint32_t prop_trie_find(uint8_t *data, const char *key)
 	}
 }
 
-/* ── Find the property area file ────────────────────────────── */
-/* Open the default property context file directly.
- * All our target properties (ro.build.*, ro.debuggable, ro.lineage.*)
- * fall under the default_prop SELinux context (plat_property_contexts
- * wildcard rule: "* u:object_r:default_prop:s0"). */
-static struct file *find_prop_area_file(void)
+/* ── Try to find property in given context file ─────────────── */
+/* Open the property context file and walk the trie for key.
+ * Returns the file pointer with trie data read, or NULL. */
+static struct file *try_context(const char *context, const char *key,
+				uint8_t **out_page, size_t *out_page_size,
+				uint32_t *out_info_off)
 {
-	static const char *paths[] = {
-		"/dev/__properties__/u:object_r:default_prop:s0",
-		NULL,
-	};
-	struct file *fp;
-	int i;
-
-	for (i = 0; paths[i]; i++) {
-		fp = filp_open(paths[i], O_RDWR, 0);
-		if (!IS_ERR(fp))
-			return fp;
-		pr_debug("susfs: property area '%s' open failed (%ld)\n",
-			 paths[i], PTR_ERR(fp));
-	}
-
-	pr_warn("susfs: no property area found\n");
-	return NULL;
-}
-
-/* ── Property set / delete ──────────────────────────────────── */
-int property_set(const char *key, const char *value)
-{
+	char path[256];
 	struct file *fp;
 	struct prop_area_header hdr;
 	loff_t pos = 0;
 	uint8_t *page = NULL;
 	uint32_t info_off;
-	int vlen = strlen(value);
-	int ret = 0;
 
-	fp = find_prop_area_file();
-	if (!fp) {
-		pr_warn("susfs: property area not found, skip '%s'\n", key);
-		return -ENOENT;
-	}
+	snprintf(path, sizeof(path),
+		 "/dev/__properties__/u:object_r:%s:s0", context);
+	fp = filp_open(path, O_RDWR, 0);
+	if (IS_ERR(fp))
+		return NULL;
 
 	kernel_read(fp, &hdr, sizeof(hdr), &pos);
 	if (hdr.magic != PROP_AREA_MAGIC) {
-		pr_err("susfs: property area bad magic (0x%x)\n", hdr.magic);
-		ret = -EINVAL;
-		goto out;
+		fput(fp);
+		return NULL;
 	}
 
-	page = kzalloc(hdr.bytes_used + PROP_AREA_HEADER_SZ, GFP_KERNEL);
+	*out_page_size = hdr.bytes_used + PROP_AREA_HEADER_SZ;
+	page = kzalloc(*out_page_size, GFP_KERNEL);
 	if (!page) {
-		ret = -ENOMEM;
-		goto out;
+		fput(fp);
+		return NULL;
 	}
 	pos = 0;
-	kernel_read(fp, page, hdr.bytes_used + PROP_AREA_HEADER_SZ, &pos);
+	kernel_read(fp, page, *out_page_size, &pos);
 
 	info_off = prop_trie_find(page + PROP_AREA_HEADER_SZ, key);
 	if (!info_off) {
-		pr_debug("susfs: property '%s' not found\n", key);
-		ret = -ENOENT;
-		goto out_free;
+		kfree(page);
+		fput(fp);
+		return NULL;
+	}
+
+	*out_page = page;
+	*out_info_off = info_off;
+	return fp;
+}
+
+/* Context files to try, in order. See plat_property_contexts. */
+static const char *prop_contexts[] = {
+	"default_prop",	/* wildcard *, covers ro.lineage.*, ro.modversion, ro.debuggable */
+	"build_prop",	/* /system/build.prop: ro.build.type, ro.build.flavor, etc. */
+	"system_prop",	/* ro.runtime.*, persist.sys.*, sys.* */
+	NULL,
+};
+
+/* ── Property set / delete ──────────────────────────────────── */
+int property_set(const char *key, const char *value)
+{
+	struct file *fp = NULL;
+	uint8_t *page = NULL;
+	uint32_t info_off;
+	size_t page_size;
+	int vlen = strlen(value);
+	int ret = -ENOENT;
+	int i;
+
+	for (i = 0; prop_contexts[i]; i++) {
+		fp = try_context(prop_contexts[i], key, &page,
+				 &page_size, &info_off);
+		if (fp)
+			break;
+	}
+
+	if (!fp) {
+		pr_debug("susfs: property '%s' not in any context\n", key);
+		return -ENOENT;
 	}
 
 	if (vlen >= PROP_VALUE_MAX)
 		vlen = PROP_VALUE_MAX - 1;
 
 	/* Write new value into shared memory */
-	pos = (loff_t)info_off + offsetof(struct prop_info_rec, value);
-	kernel_write(fp, value, vlen, &pos);
-	pos = (loff_t)info_off + offsetof(struct prop_info_rec, value) + vlen;
-	kernel_write(fp, "\0", 1, &pos);
+	{
+		loff_t pos;
+
+		pos = (loff_t)info_off + offsetof(struct prop_info_rec, value);
+		kernel_write(fp, value, vlen, &pos);
+		pos = (loff_t)info_off + offsetof(struct prop_info_rec, value) + vlen;
+		kernel_write(fp, "\0", 1, &pos);
+	}
 
 	/* Bump serial to notify readers */
 	{
 		uint32_t new_serial;
+		loff_t pos;
+
 		memcpy(&new_serial, page + info_off +
 		       offsetof(struct prop_info_rec, serial),
 		       sizeof(new_serial));
@@ -205,67 +220,54 @@ int property_set(const char *key, const char *value)
 		kernel_write(fp, &new_serial, sizeof(new_serial), &pos);
 	}
 
-	pr_info("susfs: property_set '%s' = '%s'\n", key, value);
+	pr_info("susfs: property_set '%s' = '%s' (context=%s)\n",
+		key, value, prop_contexts[i]);
 	ret = 0;
 
-out_free:
 	kfree(page);
-out:
 	fput(fp);
 	return ret;
 }
 
 int property_delete(const char *key)
 {
-	struct file *fp;
-	struct prop_area_header hdr;
-	loff_t pos = 0;
+	struct file *fp = NULL;
 	uint8_t *page = NULL;
 	uint32_t info_off;
-	int ret = 0;
+	size_t page_size;
+	int ret = -ENOENT;
+	int i;
 
-	fp = find_prop_area_file();
-	if (!fp)
+	for (i = 0; prop_contexts[i]; i++) {
+		fp = try_context(prop_contexts[i], key, &page,
+				 &page_size, &info_off);
+		if (fp)
+			break;
+	}
+
+	if (!fp) {
+		pr_debug("susfs: property '%s' not in any context\n", key);
 		return -ENOENT;
-
-	kernel_read(fp, &hdr, sizeof(hdr), &pos);
-	if (hdr.magic != PROP_AREA_MAGIC) {
-		ret = -EINVAL;
-		goto out;
-	}
-
-	page = kzalloc(hdr.bytes_used + PROP_AREA_HEADER_SZ, GFP_KERNEL);
-	if (!page) {
-		ret = -ENOMEM;
-		goto out;
-	}
-	pos = 0;
-	kernel_read(fp, page, hdr.bytes_used + PROP_AREA_HEADER_SZ, &pos);
-
-	info_off = prop_trie_find(page + PROP_AREA_HEADER_SZ, key);
-	if (!info_off) {
-		pr_debug("susfs: property '%s' not found\n", key);
-		ret = -ENOENT;
-		goto out_free;
 	}
 
 	/* Zero out name first byte to mark deleted */
 	{
 		char nul = '\0';
-		pos = (loff_t)info_off + sizeof(struct prop_info_rec);
+		loff_t pos = (loff_t)info_off + sizeof(struct prop_info_rec);
 		kernel_write(fp, &nul, 1, &pos);
 	}
 
 	/* Clear value */
 	{
 		char nul = '\0';
-		pos = (loff_t)info_off + offsetof(struct prop_info_rec, value);
+		loff_t pos = (loff_t)info_off + offsetof(struct prop_info_rec, value);
 		kernel_write(fp, &nul, 1, &pos);
 	}
 
 	/* Bump serial */
 	{
 		uint32_t new_serial;
+		loff_t pos;
 		memcpy(&new_serial, page + info_off +
 		       offsetof(struct prop_info_rec, serial),
 		       sizeof(new_serial));
@@ -275,11 +277,10 @@ int property_delete(const char *key)
 		kernel_write(fp, &new_serial, sizeof(new_serial), &pos);
 	}
 
-	pr_info("susfs: property_delete '%s'\n", key);
+	pr_info("susfs: property_delete '%s' (context=%s)\n",
+		key, prop_contexts[i]);
 
-out_free:
 	kfree(page);
-out:
 	fput(fp);
 	return ret;
 }
