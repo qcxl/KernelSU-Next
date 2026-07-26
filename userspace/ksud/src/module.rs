@@ -677,32 +677,18 @@ fn install_module_to_system(zip: &str) -> Result<()> {
     println!("- Running module installer");
     exec_install_script(zip, is_metamodule, module_id)?;
 
+    // Move module from staging (modules_update/<id>/) to active (modules/<id>/) immediately.
+    // This runs BEFORE copy/create-update so the target directory does not yet exist,
+    // avoiding ENOTEMPTY errors from std::fs::rename.
     let module_dir = Path::new(MODULE_DIR).join(module_id);
-    ensure_dir_exists(&module_dir)?;
-    copy(
-        updated_dir.join("module.prop"),
-        module_dir.join("module.prop"),
-    )?;
-    ensure_file_exists(module_dir.join(UPDATE_FILE_NAME))?;
+    let _ = std::fs::remove_dir_all(&module_dir);
+    std::fs::rename(&updated_dir, &module_dir)
+        .with_context(|| format!("Failed to move module {module_id} to active directory"))?;
 
     // Create symlink for metamodule
     if is_metamodule {
         println!("- Creating metamodule symlink");
         metamodule::ensure_symlink(&module_dir)?;
-    }
-
-    // Move module from staging to active immediately.
-    // Remove the old active module directory entirely (if any).
-    let _ = std::fs::remove_dir_all(&module_dir);
-    // Rename staging to active. Use a temp intermediate name to avoid
-    // ENOTEMPTY if the old dir removal didn't fully complete.
-    let tmp_dir = module_dir.with_file_name(format!("{}.tmp", module_id));
-    let _ = std::fs::remove_dir_all(&tmp_dir);
-    if let Err(e) = std::fs::rename(&updated_dir, &tmp_dir) {
-        println!("! WARNING: rename to tmp failed: {e}");
-    } else if let Err(e) = std::fs::rename(&tmp_dir, &module_dir) {
-        println!("! WARNING: rename to active failed: {e}");
-        let _ = std::fs::rename(&tmp_dir, &updated_dir);
     }
 
     println!("- Module installed successfully!");
