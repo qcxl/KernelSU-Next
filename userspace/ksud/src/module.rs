@@ -639,6 +639,41 @@ fn install_module_to_system(zip: &str) -> Result<()> {
         restore_syscon(&module_system_dir)?;
     }
 
+    // Handle managedFeatures internally to avoid spawning ksud as a subprocess,
+    // which would open a new KSU fd and cause the parent process (libksud.so)
+    // to be killed by KSU's prctl handler (kill old pid).
+    let managed_features_prop = module_prop.get("managedFeatures")
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    if let Some(features_str) = managed_features_prop {
+        println!("- Checking managed features: {features_str}");
+        for feature in features_str.split(',') {
+            let feature = feature.trim();
+            if feature.is_empty() { continue; }
+            let status = (|| -> Result<String> {
+                let feature_id = crate::feature::parse_feature_id(feature)
+                    .map_err(|_| anyhow::anyhow!("unknown feature: {feature}"))?;
+                let (_value, supported) = crate::ksucalls::get_feature(feature_id as u32)?;
+                Ok(if supported { "supported" } else { "unsupported" })
+            })();
+            match status.as_deref() {
+                Ok("supported") => println!("- Feature '{feature}' is supported and available"),
+                Ok("unsupported") => println!("! WARNING: Feature '{feature}' is NOT SUPPORTED by kernel"),
+                _ => println!("! WARNING: Unable to check feature '{feature}' status"),
+            }
+        }
+        // Remove managedFeatures from module.prop so the installer script's
+        // check_managed_features() won't spawn /data/adb/ksud to re-check.
+        let prop_path = updated_dir.join("module.prop");
+        let content = std::fs::read_to_string(&prop_path)
+            .unwrap_or_default();
+        let filtered: Vec<&str> = content.lines()
+            .filter(|l| !l.starts_with("managedFeatures="))
+            .collect();
+        std::fs::write(&prop_path, filtered.join("\n"))
+            .with_context(|| "Failed to update module.prop")?;
+    }
+
     // Execute install script
     println!("- Running module installer");
     exec_install_script(zip, is_metamodule, module_id)?;
