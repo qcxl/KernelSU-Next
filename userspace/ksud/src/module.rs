@@ -642,20 +642,15 @@ fn install_module_to_system(zip: &str) -> Result<()> {
     // Handle managedFeatures internally to avoid spawning ksud as a subprocess,
     // which would open a new KSU fd and cause the parent process (libksud.so)
     // to be killed by KSU's prctl handler (kill old pid).
-    let managed_features_prop = module_prop.get("managedFeatures")
+    if let Some(features_str) = module_prop.get("managedFeatures")
         .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty());
-    if let Some(features_str) = managed_features_prop {
+        .filter(|s| !s.is_empty())
+    {
         println!("- Checking managed features: {features_str}");
         for feature in features_str.split(',') {
             let feature = feature.trim();
             if feature.is_empty() { continue; }
-            let status = (|| -> Result<String> {
-                let feature_id = crate::feature::parse_feature_id(feature)
-                    .map_err(|_| anyhow::anyhow!("unknown feature: {feature}"))?;
-                let (_value, supported) = crate::ksucalls::get_feature(feature_id as u32)?;
-                Ok(if supported { "supported" } else { "unsupported" })
-            })();
+            let status = check_single_feature(feature);
             match status.as_deref() {
                 Ok("supported") => println!("- Feature '{feature}' is supported and available"),
                 Ok("unsupported") => println!("! WARNING: Feature '{feature}' is NOT SUPPORTED by kernel"),
@@ -665,13 +660,12 @@ fn install_module_to_system(zip: &str) -> Result<()> {
         // Remove managedFeatures from module.prop so the installer script's
         // check_managed_features() won't spawn /data/adb/ksud to re-check.
         let prop_path = updated_dir.join("module.prop");
-        let content = std::fs::read_to_string(&prop_path)
-            .unwrap_or_default();
-        let filtered: Vec<&str> = content.lines()
-            .filter(|l| !l.starts_with("managedFeatures="))
-            .collect();
-        std::fs::write(&prop_path, filtered.join("\n"))
-            .with_context(|| "Failed to update module.prop")?;
+        if let Ok(content) = std::fs::read_to_string(&prop_path) {
+            let filtered: Vec<&str> = content.lines()
+                .filter(|l| !l.starts_with("managedFeatures="))
+                .collect();
+            let _ = std::fs::write(&prop_path, filtered.join("\n"));
+        }
     }
 
     // Execute install script
@@ -1015,6 +1009,22 @@ pub fn list_modules() -> Result<()> {
     let modules = list_module(defs::MODULE_DIR);
     println!("{}", serde_json::to_string_pretty(&modules)?);
     Ok(())
+}
+
+/// Check a single managed feature by name, returning "supported" or "unsupported".
+fn check_single_feature(name: &str) -> Result<String> {
+    let id = match name {
+        "su_compat" => 0,
+        "kernel_umount" => 1,
+        "sulog" | "enhanced_security" => 2,
+        "adb_root" => 3,
+        "selinux_hide" => 4,
+        "set_selinux_enforce" => 5,
+        "avc_spoof" => 10003,
+        _ => bail!("Unknown feature: {name}"),
+    };
+    let (_value, supported) = crate::ksucalls::get_feature(id)?;
+    Ok(if supported { "supported" } else { "unsupported" })
 }
 
 /// Get all managed features from active modules
