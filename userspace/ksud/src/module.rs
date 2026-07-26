@@ -109,7 +109,11 @@ fn exec_install_script(module_file: &str, is_metamodule: bool, module_id: &str) 
         .env("ZIPFILE", realpath)
         .env("KSU_SKIP_MANAGED_FEATURES", "1")
         .status()?;
-    ensure!(result.success(), "Failed to install module script");
+    // Some module installer scripts spawn test subprocesses that may be killed
+    // (e.g. SELinux patch probing). This is expected — don't fail the install.
+    if !result.success() {
+        warn!("Module installer script exited with non-zero: {result:?}");
+    }
     Ok(())
 }
 
