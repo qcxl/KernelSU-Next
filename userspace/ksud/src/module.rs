@@ -667,10 +667,19 @@ pub fn install_module(zip: &str) -> Result<()> {
     ksucalls::ensure_uapi_version_matched()?;
 
     let result = install_module_to_system(zip);
-    if let Err(ref e) = result {
-        println!("- Error: {e}");
-    } else if let Err(e) = regenerate_preinit_rc() {
-        warn!("regenerate preinit rc failed: {e}");
+    if result.is_ok() {
+        // Move module files from modules_update/ (staging) to modules/ (active)
+        // immediately so the module is usable without requiring a reboot.
+        // This is a workaround for ROMs where init.rc exec injection is broken
+        // (e.g. LineageOS 13), which prevents ksud post-fs-data from running.
+        if let Err(e) = handle_updated_modules() {
+            warn!("handle updated modules failed: {e}");
+        }
+        if let Err(e) = regenerate_preinit_rc() {
+            warn!("regenerate preinit rc failed: {e}");
+        }
+    } else {
+        println!("- Error: {}", result.as_ref().unwrap_err());
     }
     result
 }
