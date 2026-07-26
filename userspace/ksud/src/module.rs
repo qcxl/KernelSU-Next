@@ -692,23 +692,17 @@ fn install_module_to_system(zip: &str) -> Result<()> {
     }
 
     // Move module from staging to active immediately.
-    // Must run BEFORE the final println: some installer scripts spawn
-    // subprocesses that trigger KSU fd kill signals after this point,
-    // which would prevent handle_updated_modules from executing.
-    let updated_path = updated_dir.clone();
-    let dest_path = module_dir.clone();
-    match std::fs::remove_dir_all(&dest_path) {
-        Ok(_) => {}
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-        Err(e) => {
-            println!("! WARNING: remove old module failed: {e}");
-        }
-    }
-    if let Err(e) = std::fs::rename(&updated_path, &dest_path) {
-        // Fallback: try handle_updated_modules
-        if let Err(e2) = handle_updated_modules() {
-            println!("! WARNING: move to active failed: {e} / {e2}");
-        }
+    // Remove the old active module directory entirely (if any).
+    let _ = std::fs::remove_dir_all(&module_dir);
+    // Rename staging to active. Use a temp intermediate name to avoid
+    // ENOTEMPTY if the old dir removal didn't fully complete.
+    let tmp_dir = module_dir.with_file_name(format!("{}.tmp", module_id));
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+    if let Err(e) = std::fs::rename(&updated_dir, &tmp_dir) {
+        println!("! WARNING: rename to tmp failed: {e}");
+    } else if let Err(e) = std::fs::rename(&tmp_dir, &module_dir) {
+        println!("! WARNING: rename to active failed: {e}");
+        let _ = std::fs::rename(&tmp_dir, &updated_dir);
     }
 
     println!("- Module installed successfully!");
