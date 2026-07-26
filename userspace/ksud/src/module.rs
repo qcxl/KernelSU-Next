@@ -706,11 +706,13 @@ pub fn install_module(zip: &str) -> Result<()> {
         // immediately so the module is usable without requiring a reboot.
         // This is a workaround for ROMs where init.rc exec injection is broken
         // (e.g. LineageOS 13), which prevents ksud post-fs-data from running.
+        println!("- Moving module to active directory");
         if let Err(e) = handle_updated_modules() {
-            warn!("handle updated modules failed: {e}");
+            println!("! WARNING: handle_updated_modules failed: {e}");
         }
+        println!("- Regenerating module config");
         if let Err(e) = regenerate_preinit_rc() {
-            warn!("regenerate preinit rc failed: {e}");
+            println!("! WARNING: regenerate preinit rc failed: {e}");
         }
     } else {
         println!("- Error: {}", result.as_ref().unwrap_err());
