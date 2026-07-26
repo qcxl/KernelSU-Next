@@ -107,6 +107,7 @@ fn exec_install_script(module_file: &str, is_metamodule: bool, module_id: &str) 
         .envs(get_common_script_envs(Some(module_id)))
         .env("OUTFD", "1")
         .env("ZIPFILE", realpath)
+        .env("KSU_SKIP_MANAGED_FEATURES", "1")
         .status()?;
     ensure!(result.success(), "Failed to install module script");
     Ok(())
