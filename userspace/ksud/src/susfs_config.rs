@@ -143,7 +143,7 @@ pub fn apply(config: &SusfsConfig) {
     }
 
     // resetprop：先设置后删除，避免冲突
-    let boot_restored = susfsd::is_boot_restored().unwrap_or(false);
+    let boot_restored = susfsd::is_boot_restored();
     if boot_restored {
         // 内核已恢复属性，跳过 delete（避免挖洞触发 Hunter "Found hole"）
         // 但仍应用 set_props（用户可能在 kernel 默认列表外添加了自定义属性）

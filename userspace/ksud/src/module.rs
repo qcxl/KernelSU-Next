@@ -1024,7 +1024,7 @@ fn check_single_feature(name: &str) -> Result<String> {
         _ => bail!("Unknown feature: {name}"),
     };
     let (_value, supported) = crate::ksucalls::get_feature(id)?;
-    Ok(if supported { "supported" } else { "unsupported" })
+    Ok(if supported { "supported".into() } else { "unsupported".into() })
 }
 
 /// Get all managed features from active modules

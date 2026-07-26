@@ -103,7 +103,6 @@ static void susfs_restore_boot(void)
 			"/system/addon.d",
 			"/system/build.prop",
 			"/data/adb/modules",
-			"/data/adb/modules_update",
 			"/data/adb/ksu-pdeath",
 			"/data/adb/ksu/.allowlist",
 			"/data/adb/ksu/.feature_config",
