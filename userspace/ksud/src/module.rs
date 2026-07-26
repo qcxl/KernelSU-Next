@@ -695,8 +695,20 @@ fn install_module_to_system(zip: &str) -> Result<()> {
     // Must run BEFORE the final println: some installer scripts spawn
     // subprocesses that trigger KSU fd kill signals after this point,
     // which would prevent handle_updated_modules from executing.
-    if let Err(e) = handle_updated_modules() {
-        println!("! WARNING: move to active failed: {e}");
+    let updated_path = updated_dir.clone();
+    let dest_path = module_dir.clone();
+    match std::fs::remove_dir_all(&dest_path) {
+        Ok(_) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => {
+            println!("! WARNING: remove old module failed: {e}");
+        }
+    }
+    if let Err(e) = std::fs::rename(&updated_path, &dest_path) {
+        // Fallback: try handle_updated_modules
+        if let Err(e2) = handle_updated_modules() {
+            println!("! WARNING: move to active failed: {e} / {e2}");
+        }
     }
 
     println!("- Module installed successfully!");
