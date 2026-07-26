@@ -691,6 +691,14 @@ fn install_module_to_system(zip: &str) -> Result<()> {
         metamodule::ensure_symlink(&module_dir)?;
     }
 
+    // Move module from staging to active immediately.
+    // Must run BEFORE the final println: some installer scripts spawn
+    // subprocesses that trigger KSU fd kill signals after this point,
+    // which would prevent handle_updated_modules from executing.
+    if let Err(e) = handle_updated_modules() {
+        println!("! WARNING: move to active failed: {e}");
+    }
+
     println!("- Module installed successfully!");
     info!("Module {module_id} installed successfully!");
 
@@ -702,15 +710,6 @@ pub fn install_module(zip: &str) -> Result<()> {
 
     let result = install_module_to_system(zip);
     if result.is_ok() {
-        // Move module files from modules_update/ (staging) to modules/ (active)
-        // immediately so the module is usable without requiring a reboot.
-        // This is a workaround for ROMs where init.rc exec injection is broken
-        // (e.g. LineageOS 13), which prevents ksud post-fs-data from running.
-        println!("- Moving module to active directory");
-        if let Err(e) = handle_updated_modules() {
-            println!("! WARNING: handle_updated_modules failed: {e}");
-        }
-        println!("- Regenerating module config");
         if let Err(e) = regenerate_preinit_rc() {
             println!("! WARNING: regenerate preinit rc failed: {e}");
         }
