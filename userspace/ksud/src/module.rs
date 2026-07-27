@@ -678,11 +678,14 @@ fn install_module_to_system(zip: &str) -> Result<()> {
     exec_install_script(zip, is_metamodule, module_id)?;
 
     // Move module from staging (modules_update/<id>/) to active (modules/<id>/) immediately.
-    // This runs BEFORE copy/create-update so the target directory does not yet exist,
-    // avoiding ENOTEMPTY errors from std::fs::rename.
+    // Use a temp name to avoid directory-into-directory move semantics when target exists.
     let module_dir = Path::new(MODULE_DIR).join(module_id);
+    let tmp_dir = module_dir.parent().unwrap().join(format!("{}.tmp", module_id));
     let _ = std::fs::remove_dir_all(&module_dir);
-    std::fs::rename(&updated_dir, &module_dir)
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+    std::fs::rename(&updated_dir, &tmp_dir)?;
+    let _ = std::fs::remove_dir_all(&module_dir);
+    std::fs::rename(&tmp_dir, &module_dir)
         .with_context(|| format!("Failed to move module {module_id} to active directory"))?;
 
     // Create symlink for metamodule
