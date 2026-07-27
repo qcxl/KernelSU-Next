@@ -681,12 +681,25 @@ fn install_module_to_system(zip: &str) -> Result<()> {
     // Use a temp name to avoid directory-into-directory move semantics when target exists.
     let module_dir = Path::new(MODULE_DIR).join(module_id);
     let tmp_dir = module_dir.parent().unwrap().join(format!("{}.tmp", module_id));
+    // Debug: count files before
+    let staging_count = || -> usize { std::fs::read_dir(&updated_dir).map(|d| d.count()).unwrap_or(0) };
+    let before = staging_count();
+    eprintln!("DEBUG: staging has {before} files");
+    // Remove old and temp dirs
     let _ = std::fs::remove_dir_all(&module_dir);
     let _ = std::fs::remove_dir_all(&tmp_dir);
+    // Phase 1: rename staging → tmp (target /data/adb/modules/rezygisk.tmp doesn't exist → always works)
+    eprintln!("DEBUG: rename {} → {}", updated_dir.display(), tmp_dir.display());
     std::fs::rename(&updated_dir, &tmp_dir)?;
+    // Phase 2: remove old module dir (in case it was recreated), then rename tmp → final
     let _ = std::fs::remove_dir_all(&module_dir);
+    eprintln!("DEBUG: rename {} → {}", tmp_dir.display(), module_dir.display());
     std::fs::rename(&tmp_dir, &module_dir)
         .with_context(|| format!("Failed to move module {module_id} to active directory"))?;
+    eprintln!("DEBUG: move complete, checking files...");
+    let after = || -> usize { std::fs::read_dir(&module_dir).map(|d| d.count()).unwrap_or(0) };
+    let count = after();
+    eprintln!("DEBUG: modules/{} has {count} files", module_id);
 
     // Create symlink for metamodule
     if is_metamodule {
