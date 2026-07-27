@@ -249,11 +249,6 @@ api_level_arch_detect() {
 #################
 
 check_managed_features() {
-  # If KSU already handled managedFeatures internally, skip to avoid
-  # spawning /data/adb/ksud as a subprocess (which opens a new KSU fd
-  # and kills the parent process via ksu_prctl handler).
-  [ "$KSU_SKIP_MANAGED_FEATURES" = "1" ] && return 0
-
   local PROP_FILE=$1
   local MANAGED_FEATURES=$(grep_prop managedFeatures "$PROP_FILE")
 

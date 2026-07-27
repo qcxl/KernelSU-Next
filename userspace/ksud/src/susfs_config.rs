@@ -61,20 +61,18 @@ fn default_config() -> SusfsConfig {
             ("ro.debuggable".into(), "0".into()),
             ("ro.build.user".into(), "jenkins".into()),
             ("ro.build.host".into(), "rd-build-193".into()),
-            // Set empty instead of delete — deleting zeroes name[0] which
-            // creates a "hole" in the property trie that Hunter detects as
-            // "Find Prop Modify Mark: Found hole in prop area".
-            ("ro.lineage.version".into(), "".into()),
-            ("ro.lineage.build.version".into(), "".into()),
-            ("ro.lineage.build.version.plat.rev".into(), "".into()),
-            ("ro.lineage.build.version.plat.sdk".into(), "".into()),
-            ("ro.lineage.device".into(), "".into()),
-            ("ro.lineage.display.version".into(), "".into()),
-            ("ro.lineage.releasetype".into(), "".into()),
-            ("ro.lineagelegal.url".into(), "".into()),
-            ("ro.modversion".into(), "".into()),
         ]),
-        delete_props: vec![],
+        delete_props: vec![
+            "ro.lineage.version".into(),
+            "ro.lineage.build.version".into(),
+            "ro.lineage.build.version.plat.rev".into(),
+            "ro.lineage.build.version.plat.sdk".into(),
+            "ro.lineage.device".into(),
+            "ro.lineage.display.version".into(),
+            "ro.lineage.releasetype".into(),
+            "ro.lineagelegal.url".into(),
+            "ro.modversion".into(),
+        ],
     }
 }
 
@@ -143,20 +141,11 @@ pub fn apply(config: &SusfsConfig) {
     }
 
     // resetprop：先设置后删除，避免冲突
-    let boot_restored = susfsd::is_boot_restored();
-    if boot_restored {
-        // 内核已恢复属性，跳过 delete（避免挖洞触发 Hunter "Found hole"）
-        // 但仍应用 set_props（用户可能在 kernel 默认列表外添加了自定义属性）
-        for key in &config.delete_props {
-            log::info!("susfs: skip delete_prop '{}' (kernel restored)", key);
-        }
-    } else {
-        for key in &config.delete_props {
-            let _ = susfsd::delete_prop(key);
-        }
-    }
     for (key, value) in &config.set_props {
         let _ = susfsd::set_prop(key, value);
+    }
+    for key in &config.delete_props {
+        let _ = susfsd::delete_prop(key);
     }
 }
 

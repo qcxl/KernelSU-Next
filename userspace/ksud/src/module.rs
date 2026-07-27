@@ -107,13 +107,8 @@ fn exec_install_script(module_file: &str, is_metamodule: bool, module_id: &str) 
         .envs(get_common_script_envs(Some(module_id)))
         .env("OUTFD", "1")
         .env("ZIPFILE", realpath)
-        .env("KSU_SKIP_MANAGED_FEATURES", "1")
         .status()?;
-    // Some module installer scripts spawn test subprocesses that may be killed
-    // (e.g. SELinux patch probing). This is expected — don't fail the install.
-    if !result.success() {
-        warn!("Module installer script exited with non-zero: {result:?}");
-    }
+    ensure!(result.success(), "Failed to install module script");
     Ok(())
 }
 
@@ -644,62 +639,17 @@ fn install_module_to_system(zip: &str) -> Result<()> {
         restore_syscon(&module_system_dir)?;
     }
 
-    // Handle managedFeatures internally to avoid spawning ksud as a subprocess,
-    // which would open a new KSU fd and cause the parent process (libksud.so)
-    // to be killed by KSU's prctl handler (kill old pid).
-    if let Some(features_str) = module_prop.get("managedFeatures")
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-    {
-        println!("- Checking managed features: {features_str}");
-        for feature in features_str.split(',') {
-            let feature = feature.trim();
-            if feature.is_empty() { continue; }
-            let status = check_single_feature(feature);
-            match status.as_deref() {
-                Ok("supported") => println!("- Feature '{feature}' is supported and available"),
-                Ok("unsupported") => println!("! WARNING: Feature '{feature}' is NOT SUPPORTED by kernel"),
-                _ => println!("! WARNING: Unable to check feature '{feature}' status"),
-            }
-        }
-        // Remove managedFeatures from module.prop so the installer script's
-        // check_managed_features() won't spawn /data/adb/ksud to re-check.
-        let prop_path = updated_dir.join("module.prop");
-        if let Ok(content) = std::fs::read_to_string(&prop_path) {
-            let filtered: Vec<&str> = content.lines()
-                .filter(|l| !l.starts_with("managedFeatures="))
-                .collect();
-            let _ = std::fs::write(&prop_path, filtered.join("\n"));
-        }
-    }
-
     // Execute install script
     println!("- Running module installer");
     exec_install_script(zip, is_metamodule, module_id)?;
 
-    // Move module from staging (modules_update/<id>/) to active (modules/<id>/) immediately.
-    // Use a temp name to avoid directory-into-directory move semantics when target exists.
     let module_dir = Path::new(MODULE_DIR).join(module_id);
-    let tmp_dir = module_dir.parent().unwrap().join(format!("{}.tmp", module_id));
-    // Debug: count files before
-    let staging_count = || -> usize { std::fs::read_dir(&updated_dir).map(|d| d.count()).unwrap_or(0) };
-    let before = staging_count();
-    eprintln!("DEBUG: staging has {before} files");
-    // Remove old and temp dirs
-    let _ = std::fs::remove_dir_all(&module_dir);
-    let _ = std::fs::remove_dir_all(&tmp_dir);
-    // Phase 1: rename staging → tmp (target /data/adb/modules/rezygisk.tmp doesn't exist → always works)
-    eprintln!("DEBUG: rename {} → {}", updated_dir.display(), tmp_dir.display());
-    std::fs::rename(&updated_dir, &tmp_dir)?;
-    // Phase 2: remove old module dir (in case it was recreated), then rename tmp → final
-    let _ = std::fs::remove_dir_all(&module_dir);
-    eprintln!("DEBUG: rename {} → {}", tmp_dir.display(), module_dir.display());
-    std::fs::rename(&tmp_dir, &module_dir)
-        .with_context(|| format!("Failed to move module {module_id} to active directory"))?;
-    eprintln!("DEBUG: move complete, checking files...");
-    let after = || -> usize { std::fs::read_dir(&module_dir).map(|d| d.count()).unwrap_or(0) };
-    let count = after();
-    eprintln!("DEBUG: modules/{} has {count} files", module_id);
+    ensure_dir_exists(&module_dir)?;
+    copy(
+        updated_dir.join("module.prop"),
+        module_dir.join("module.prop"),
+    )?;
+    ensure_file_exists(module_dir.join(UPDATE_FILE_NAME))?;
 
     // Create symlink for metamodule
     if is_metamodule {
@@ -717,12 +667,10 @@ pub fn install_module(zip: &str) -> Result<()> {
     ksucalls::ensure_uapi_version_matched()?;
 
     let result = install_module_to_system(zip);
-    if result.is_ok() {
-        if let Err(e) = regenerate_preinit_rc() {
-            println!("! WARNING: regenerate preinit rc failed: {e}");
-        }
-    } else {
-        println!("- Error: {}", result.as_ref().unwrap_err());
+    if let Err(ref e) = result {
+        println!("- Error: {e}");
+    } else if let Err(e) = regenerate_preinit_rc() {
+        warn!("regenerate preinit rc failed: {e}");
     }
     result
 }
@@ -1023,22 +971,6 @@ pub fn list_modules() -> Result<()> {
     let modules = list_module(defs::MODULE_DIR);
     println!("{}", serde_json::to_string_pretty(&modules)?);
     Ok(())
-}
-
-/// Check a single managed feature by name, returning "supported" or "unsupported".
-fn check_single_feature(name: &str) -> Result<String> {
-    let id = match name {
-        "su_compat" => 0,
-        "kernel_umount" => 1,
-        "sulog" | "enhanced_security" => 2,
-        "adb_root" => 3,
-        "selinux_hide" => 4,
-        "set_selinux_enforce" => 5,
-        "avc_spoof" => 10003,
-        _ => bail!("Unknown feature: {name}"),
-    };
-    let (_value, supported) = crate::ksucalls::get_feature(id)?;
-    Ok(if supported { "supported".into() } else { "unsupported".into() })
 }
 
 /// Get all managed features from active modules
