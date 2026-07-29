@@ -300,19 +300,32 @@ fun flashModule(
     onStderr: (String) -> Unit
 ): FlashResult {
     val resolver = ksuApp.contentResolver
-    with(resolver.openInputStream(uri)) {
-        val file = File(ksuApp.cacheDir, "module.zip")
-        file.outputStream().use { output ->
-            this?.copyTo(output)
-        }
-        val cmd = "module install ${file.absolutePath}"
-        val result = flashWithIO("${getKsuDaemonPath()} $cmd", onStdout, onStderr)
-        Log.i("KernelSU", "install module $uri result: $result")
+    val tmpPath = "/data/adb/tmp_module_install.zip"
 
-        file.delete()
+    /* Read zip in App process (has ContentResolver + CE key), write to
+     * /data/adb/ via SuFile (root) so ksud reads from DE storage (always
+     * accessible, no cross-encryption-domain issue). */
+    val inputStream = resolver.openInputStream(uri)
+        ?: return FlashResult(1, "Failed to open zip", false)
 
-        return FlashResult(result)
+    val bytes = inputStream.use { it.readBytes() }
+    try {
+        val tmpFile = com.topjohnwu.superuser.io.SuFile(tmpPath)
+        tmpFile.parentFile?.mkdirs()
+        tmpFile.newOutputStream().use { it.write(bytes) }
+        tmpFile.setReadable(true, false)
+    } catch (e: Exception) {
+        Log.e(TAG, "Failed to write zip to $tmpPath", e)
+        return FlashResult(1, "Failed to copy zip: ${e.message}", false)
     }
+
+    val cmd = "module install $tmpPath"
+    val result = flashWithIO("${getKsuDaemonPath()} $cmd", onStdout, onStderr)
+    Log.i("KernelSU", "install module $uri result: $result")
+
+    withNewRootShell { ShellUtils.fastCmdResult(this, "rm -f $tmpPath") }
+
+    return FlashResult(result)
 }
 
 fun runModuleAction(
