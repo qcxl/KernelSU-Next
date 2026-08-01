@@ -70,14 +70,11 @@ fn default_config() -> SusfsConfig {
             ("ro.vendor_dlkm.build.type".into(), "user".into()),
             ("ro.odm.build.type".into(), "user".into()),
             ("ro.product.build.tags".into(), "release-keys".into()),
-            // Model variants: real device is KB2005, spoof to KB2000 to
-            // match ro.product.model.
-            ("ro.product.bootimage.model".into(), "KB2000".into()),
-            ("ro.product.odm.model".into(), "KB2000".into()),
-            ("ro.product.system.model".into(), "KB2000".into()),
-            ("ro.product.system_ext.model".into(), "KB2000".into()),
-            ("ro.product.vendor.model".into(), "KB2000".into()),
-            ("ro.product.vendor_dlkm.model".into(), "KB2000".into()),
+            // Do NOT spoof ro.product.*.model partition variants: the CIB
+            // mobile banking app (com.cib.cibmb) pops "unsafe device (110)"
+            // and force-closes when they are changed from the real KB2005.
+            // Keep them at vendor build.prop values; ro.product.model is
+            // already KB2000 (real) and Hunter accepts the mix.
             ("ro.boot.verifiedbootstate".into(), "green".into()),
         ]),
         /* Do NOT delete ro.lineage.* / ro.modversion here.
