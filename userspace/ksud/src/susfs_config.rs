@@ -80,17 +80,14 @@ fn default_config() -> SusfsConfig {
             ("ro.product.vendor_dlkm.model".into(), "KB2000".into()),
             ("ro.boot.verifiedbootstate".into(), "green".into()),
         ]),
-        delete_props: vec![
-            "ro.lineage.version".into(),
-            "ro.lineage.build.version".into(),
-            "ro.lineage.build.version.plat.rev".into(),
-            "ro.lineage.build.version.plat.sdk".into(),
-            "ro.lineage.device".into(),
-            "ro.lineage.display.version".into(),
-            "ro.lineage.releasetype".into(),
-            "ro.lineagelegal.url".into(),
-            "ro.modversion".into(),
-        ],
+        /* Do NOT delete ro.lineage.* / ro.modversion here.
+         * resetprop --delete zeroes the prop name's first byte in the
+         * property area trie, leaving a "hole" that Hunter detects as
+         * "Find Prop Modify Mark (Found hole in prop area:
+         * u:object_r:default_prop:s0)".  These props carry valid values
+         * from LineageOS boot; leaving them intact keeps the property
+         * area layout pristine. */
+        delete_props: vec![],
     }
 }
 
