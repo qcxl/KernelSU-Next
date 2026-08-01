@@ -40,7 +40,7 @@ static RESTORED: AtomicBool = AtomicBool::new(false);
 fn default_config() -> SusfsConfig {
     SusfsConfig {
         uname_release: "4.19.304".to_string(),
-        uname_version: "Default/4.19".to_string(),
+        uname_version: "#1 SMP PREEMPT Fri Feb 9 00:58:10 UTC 2024".to_string(),
         sus_paths: vec![
             "/system/bin/su".to_string(),
             "/odm/bin/su".to_string(),
@@ -61,6 +61,24 @@ fn default_config() -> SusfsConfig {
             ("ro.debuggable".into(), "0".into()),
             ("ro.build.user".into(), "jenkins".into()),
             ("ro.build.host".into(), "rd-build-193".into()),
+            // Partition prop variants must match ro.build.* or scanners
+            // (Hunter) flag the contradiction as "ROM may be modified".
+            ("ro.product.build.type".into(), "user".into()),
+            ("ro.system.build.type".into(), "user".into()),
+            ("ro.system_ext.build.type".into(), "user".into()),
+            ("ro.vendor.build.type".into(), "user".into()),
+            ("ro.vendor_dlkm.build.type".into(), "user".into()),
+            ("ro.odm.build.type".into(), "user".into()),
+            ("ro.product.build.tags".into(), "release-keys".into()),
+            // Model variants: real device is KB2005, spoof to KB2000 to
+            // match ro.product.model.
+            ("ro.product.bootimage.model".into(), "KB2000".into()),
+            ("ro.product.odm.model".into(), "KB2000".into()),
+            ("ro.product.system.model".into(), "KB2000".into()),
+            ("ro.product.system_ext.model".into(), "KB2000".into()),
+            ("ro.product.vendor.model".into(), "KB2000".into()),
+            ("ro.product.vendor_dlkm.model".into(), "KB2000".into()),
+            ("ro.boot.verifiedbootstate".into(), "green".into()),
         ]),
         delete_props: vec![
             "ro.lineage.version".into(),
