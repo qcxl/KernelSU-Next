@@ -76,14 +76,28 @@ fn default_config() -> SusfsConfig {
             // Keep them at vendor build.prop values; ro.product.model is
             // already KB2000 (real) and Hunter accepts the mix.
             ("ro.boot.verifiedbootstate".into(), "green".into()),
+            // Clear ro.lineage.* / ro.modversion to empty STRING (NOT delete)
+            // via resetprop. These props are a LineageOS fingerprint that
+            // the CIB bank app (com.cib.cibmb) detects -> "unsafe device
+            // (110)" force-close. resetprop setting "" uses the bionic
+            // protocol which keeps the prop area structure intact (no
+            // Hunter hole), unlike the kernel property_set kernel_write
+            // path which leaves orphan entries.
+            ("ro.lineage.version".into(), "".into()),
+            ("ro.lineage.build.version".into(), "".into()),
+            ("ro.lineage.build.version.plat.rev".into(), "".into()),
+            ("ro.lineage.build.version.plat.sdk".into(), "".into()),
+            ("ro.lineage.device".into(), "".into()),
+            ("ro.lineage.display.version".into(), "".into()),
+            ("ro.lineage.releasetype".into(), "".into()),
+            ("ro.lineagelegal.url".into(), "".into()),
+            ("ro.modversion".into(), "".into()),
         ]),
-        /* Do NOT delete ro.lineage.* / ro.modversion here.
-         * resetprop --delete zeroes the prop name's first byte in the
-         * property area trie, leaving a "hole" that Hunter detects as
-         * "Find Prop Modify Mark (Found hole in prop area:
-         * u:object_r:default_prop:s0)".  These props carry valid values
-         * from LineageOS boot; leaving them intact keeps the property
-         * area layout pristine. */
+        /* Do NOT delete ro.lineage.* / ro.modversion via resetprop --delete:
+         * deletion zeroes the name's first byte breaking the trie, leaving
+         * a "hole" that Hunter detects. Clearing to empty string via
+         * set_props (resetprop <key> "") keeps structure intact. See the
+         * set_props entries above. */
         delete_props: vec![],
     }
 }
