@@ -1128,13 +1128,9 @@ private fun InfoCard(autoExpand: Boolean = false) {
                         )
 
                         Spacer(Modifier.height(16.dp))
-                        var selinuxStatus by remember { mutableStateOf("") }
-                        LaunchedEffect(Unit) {
-                            selinuxStatus = withContext(Dispatchers.IO) { getSELinuxStatus() }
-                        }
                         InfoCardItem(
                             label = stringResource(R.string.home_selinux_status),
-                            content = selinuxStatus,
+                            content = getSELinuxStatus(),
                             icon = Icons.Filled.Security,
                         )
 
