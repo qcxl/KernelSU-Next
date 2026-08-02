@@ -46,7 +46,9 @@ import com.rifsxd.ksunext.ui.component.profile.TemplateConfig
 import com.rifsxd.ksunext.ui.util.*
 import com.rifsxd.ksunext.ui.viewmodel.SuperUserViewModel
 import com.rifsxd.ksunext.ui.viewmodel.getTemplateInfoById
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * @author weishu
@@ -79,12 +81,13 @@ fun AppProfileScreen(
     val suNotAllowed = stringResource(R.string.su_not_allowed).format(appInfo.label)
 
     val packageName = appInfo.packageName
-    val initialProfile = Natives.getAppProfile(packageName, appInfo.uid)
-    if (initialProfile.allowSu) {
-        initialProfile.rules = getSepolicy(packageName)
-    }
-    var profile by rememberSaveable {
-        mutableStateOf(initialProfile)
+    val initialProfile = remember { Natives.getAppProfile(packageName, appInfo.uid) }
+    var profile by rememberSaveable { mutableStateOf(initialProfile) }
+    LaunchedEffect(Unit) {
+        if (initialProfile.allowSu) {
+            val rules = withContext(Dispatchers.IO) { getSepolicy(packageName) }
+            profile = profile.copy(rules = rules)
+        }
     }
 
     val scrollState = LocalScrollState.current
@@ -143,7 +146,7 @@ fun AppProfileScreen(
                             snackBarHost.showSnackbar(suNotAllowed)
                             return@launch
                         }
-                        if (!it.rootUseDefault && it.rules.isNotEmpty() && !setSepolicy(profile.name, it.rules)) {
+                        if (!it.rootUseDefault && it.rules.isNotEmpty() && !withContext(Dispatchers.IO) { setSepolicy(profile.name, it.rules) }) {
                             snackBarHost.showSnackbar(failToUpdateSepolicy)
                             return@launch
                         }

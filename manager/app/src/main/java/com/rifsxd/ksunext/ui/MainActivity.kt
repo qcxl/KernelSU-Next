@@ -49,6 +49,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.Velocity
 import androidx.lifecycle.lifecycleScope
 import kotlin.math.abs
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.ramcosta.composedestinations.DestinationsNavHost
 import com.ramcosta.composedestinations.animations.NavHostAnimatedDestinationStyle
@@ -218,6 +219,13 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        val isManager = Natives.isManager
+        if (isManager) {
+            lifecycleScope.launch(Dispatchers.IO) {
+                install()
+            }
+        }
+
         enableEdgeToEdge()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.isNavigationBarContrastEnforced = false
@@ -227,9 +235,6 @@ class MainActivity : ComponentActivity() {
             val prefsInit = getSharedPreferences("settings", MODE_PRIVATE)
             amoledModeState.value = prefsInit.getBoolean("enable_amoled", false)
         } catch (_: Exception) {}
-
-        val isManager = Natives.isManager
-        if (isManager) install()
 
         if ((intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0) {
             intent.extras?.clear()
@@ -250,7 +255,8 @@ class MainActivity : ComponentActivity() {
                 val navigator = navController.rememberDestinationsNavigator()
 
                 val isManager = Natives.isManager
-                val fullFeatured = isManager && !Natives.requireNewKernel() && rootAvailable()
+                val rootAvail = remember { rootAvailable() }
+                val fullFeatured = isManager && !Natives.requireNewKernel() && rootAvail
 
                 val currentBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = currentBackStackEntry?.destination?.route
@@ -531,7 +537,8 @@ private fun BottomBar(
 ) {
     val navigator = navController.rememberDestinationsNavigator()
     val isManager = Natives.isManager
-    val fullFeatured = isManager && !Natives.requireNewKernel() && rootAvailable()
+    val rootAvail = remember { rootAvailable() }
+    val fullFeatured = isManager && !Natives.requireNewKernel() && rootAvail
 
     val visibleDestinations = remember(fullFeatured) {
         BottomBarDestination.entries.filter { fullFeatured || !it.rootRequired }

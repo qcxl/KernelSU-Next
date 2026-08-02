@@ -280,7 +280,7 @@ sealed class InstallMethod {
 
 @Composable
 private fun SelectInstallMethod(selectedMethod: InstallMethod?, onSelected: (InstallMethod) -> Unit = {}) {
-    val rootAvailable = rootAvailable()
+    val rootAvailable = remember { rootAvailable() }
     val isAbDevice = produceState(initialValue = false) {
         value = isAbDevice()
     }.value

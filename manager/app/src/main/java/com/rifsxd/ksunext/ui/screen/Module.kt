@@ -82,6 +82,8 @@ import com.rifsxd.ksunext.ui.component.ShortcutDialog
 import com.rifsxd.ksunext.ui.util.module.Shortcut
 import com.rifsxd.ksunext.ui.util.*
 import com.rifsxd.ksunext.ui.viewmodel.ModuleViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.rifsxd.ksunext.ui.webui.WebUIActivity
 import com.topjohnwu.superuser.io.SuFile
 import kotlinx.coroutines.Dispatchers
@@ -112,7 +114,9 @@ fun ModuleScreen(navigator: DestinationsNavigator) {
         }
     }
 
-    val hasMagisk = remember { hasMagisk() }
+    val hasMagisk by produceState(initialValue = false, key1 = Unit) {
+        value = withContext(Dispatchers.IO) { hasMagisk() }
+    }
 
     val hideInstallButton = hasMagisk
 

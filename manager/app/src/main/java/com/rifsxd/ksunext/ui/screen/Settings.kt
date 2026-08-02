@@ -385,7 +385,11 @@ private fun SecurityCard(
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             var isSelinuxPermissive by rememberSaveable {
-                mutableStateOf(getSelinuxEnforce() == false)
+                mutableStateOf(false)
+            }
+            LaunchedEffect(Unit) {
+                val enforce = withContext(Dispatchers.IO) { getSelinuxEnforce() }
+                if (enforce != null) isSelinuxPermissive = !enforce
             }
 
             SwitchItem(

@@ -98,7 +98,8 @@ fun HomeScreen(navigator: DestinationsNavigator) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
 
     val isManager = Natives.isManager
-    val fullFeatured = isManager && !Natives.requireNewKernel() && rootAvailable()
+    val rootAvail = remember { rootAvailable() }
+    val fullFeatured = isManager && !Natives.requireNewKernel() && rootAvail
     val ksuVersion = if (isManager) Natives.version else null
     val ksuVersionTag = if (isManager) Natives.getVersionTag() else null
     val kernelUAPIVersion = if (isManager) Natives.kernelUAPIVersion else null
@@ -242,7 +243,7 @@ fun HomeScreen(navigator: DestinationsNavigator) {
                 }
             }
 
-            if (ksuVersion != null && !rootAvailable()) {
+            if (ksuVersion != null && !rootAvail) {
                 WarningCard(
                     stringResource(id = R.string.grant_root_failed),
                     onClick = {
@@ -307,7 +308,9 @@ private fun SuperuserCard(onClick: (() -> Unit)? = null) {
 
 @Composable
 private fun ModuleCard(onClick: (() -> Unit)? = null) {
-    val count = getModuleCount()
+    val count by produceState(initialValue = 0, key1 = Unit) {
+        value = withContext(Dispatchers.IO) { getModuleCount() }
+    }
     val moduleViewModel: ModuleViewModel = viewModel()
 
     // State machine: 0 = nothing, 1 = show "+ Update!", 2 = show "+ X"
@@ -1045,7 +1048,23 @@ private fun InfoCard(autoExpand: Boolean = false) {
                 }
 
                 if (ksuVersion != null) {
-                    val metaModule = getMetaModule()
+                    val infoCardData by produceState(
+                        initialValue = listOf("", "", "", ""),
+                        key1 = ksuVersion
+                    ) {
+                        value = withContext(Dispatchers.IO) {
+                            listOf(
+                                getMetaModule(),
+                                getSuSFS(),
+                                getSuSFSVersion(),
+                                getSuSFSVariant()
+                            )
+                        }
+                    }
+                    val metaModule = infoCardData[0]
+                    val suSFS = infoCardData[1]
+                    val suSFSVersion = infoCardData[2]
+                    val suSFSVariant = infoCardData[3]
                     val moduleViewModel: ModuleViewModel = viewModel()
                     val metaInfo = moduleViewModel.moduleList.firstOrNull { it.isMetaModule }
                     val metaDetail = if (metaInfo != null) " | ${metaInfo.name} | ${metaInfo.version}" else ""
@@ -1063,12 +1082,11 @@ private fun InfoCard(autoExpand: Boolean = false) {
                         icon = Icons.Filled.SettingsSuggest
                     )
 
-                    val suSFS = getSuSFS()
                     if (suSFS == "Supported") {
                         Spacer(Modifier.height(16.dp))
                         InfoCardItem(
                             label = stringResource(R.string.home_susfs_version),
-                            content = "${stringResource(R.string.supported)} | ${getSuSFSVersion()} (${getSuSFSVariant()})",
+                            content = "${stringResource(R.string.supported)} | $suSFSVersion ($suSFSVariant)",
                             icon = painterResource(R.drawable.ic_sus),
                         )
                     }
@@ -1110,9 +1128,12 @@ private fun InfoCard(autoExpand: Boolean = false) {
                         )
 
                         Spacer(Modifier.height(16.dp))
+                        val selinuxStatus by produceState(initialValue = "", key1 = Unit) {
+                            value = withContext(Dispatchers.IO) { getSELinuxStatus() }
+                        }
                         InfoCardItem(
                             label = stringResource(R.string.home_selinux_status),
-                            content = getSELinuxStatus(),
+                            content = selinuxStatus,
                             icon = Icons.Filled.Security,
                         )
 

@@ -28,6 +28,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.lifecycle.compose.dropUnlessResumed
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
 import com.ramcosta.composedestinations.result.ResultBackNavigator
@@ -62,6 +67,8 @@ fun TemplateEditorScreen(
     var template by rememberSaveable {
         mutableStateOf(initialTemplate)
     }
+    val scope = rememberCoroutineScope()
+    var saveJob by remember { mutableStateOf<Job?>(null) }
 
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     // Bottom bar scroll tracking
@@ -155,12 +162,16 @@ fun TemplateEditorScreen(
                     errorHint = errorHint,
                     isError = errorHint.isNotEmpty()
                 ) { value ->
-                    errorHint = if (isTemplateExist(value)) {
-                        idConflictError
-                    } else if (!isValidTemplateId(value)) {
-                        idInvalidError
-                    } else {
-                        ""
+                    saveJob?.cancel()
+                    saveJob = scope.launch {
+                        delay(300)
+                        errorHint = if (withContext(Dispatchers.IO) { isTemplateExist(value) }) {
+                            idConflictError
+                        } else if (!isValidTemplateId(value)) {
+                            idInvalidError
+                        } else {
+                            ""
+                        }
                     }
                     template = template.copy(id = value)
                 }
@@ -170,35 +181,33 @@ fun TemplateEditorScreen(
                 label = stringResource(id = R.string.app_profile_template_name),
                 text = template.name
             ) { value ->
-                template.copy(name = value).run {
+                template = template.copy(name = value)
+                saveJob?.cancel()
+                saveJob = scope.launch {
+                    delay(300)
                     if (autoSave) {
-                        if (!saveTemplate(this)) {
-                            // failed
-                            return@run
-                        }
+                        withContext(Dispatchers.IO) { saveTemplate(template) }
                     }
-                    template = this
                 }
             }
             TextEdit(
                 label = stringResource(id = R.string.app_profile_template_description),
                 text = template.description
             ) { value ->
-                template.copy(description = value).run {
+                template = template.copy(description = value)
+                saveJob?.cancel()
+                saveJob = scope.launch {
+                    delay(300)
                     if (autoSave) {
-                        if (!saveTemplate(this)) {
-                            // failed
-                            return@run
-                        }
+                        withContext(Dispatchers.IO) { saveTemplate(template) }
                     }
-                    template = this
                 }
             }
 
             RootProfileConfig(fixedName = true,
                 profile = toNativeProfile(template),
                 onProfileChange = {
-                    template.copy(
+                    val updated = template.copy(
                         uid = it.uid,
                         gid = it.gid,
                         groups = it.groups,
@@ -207,14 +216,14 @@ fun TemplateEditorScreen(
                         namespace = it.namespace,
                         rules = it.rules.split("\n"),
                         flags = it.flags.toRootProfileFlags().toOrdinalList()
-                    ).run {
+                    )
+                    template = updated
+                    saveJob?.cancel()
+                    saveJob = scope.launch {
+                        delay(300)
                         if (autoSave) {
-                            if (!saveTemplate(this)) {
-                                // failed
-                                return@run
-                            }
+                            withContext(Dispatchers.IO) { saveTemplate(updated) }
                         }
-                        template = this
                     }
                 })
         }
