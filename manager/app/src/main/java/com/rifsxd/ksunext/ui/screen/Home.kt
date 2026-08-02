@@ -1048,23 +1048,7 @@ private fun InfoCard(autoExpand: Boolean = false) {
                 }
 
                 if (ksuVersion != null) {
-                    val infoCardData by produceState(
-                        initialValue = listOf("", "", "", ""),
-                        key1 = ksuVersion
-                    ) {
-                        value = withContext(Dispatchers.IO) {
-                            listOf(
-                                getMetaModule(),
-                                getSuSFS(),
-                                getSuSFSVersion(),
-                                getSuSFSVariant()
-                            )
-                        }
-                    }
-                    val metaModule = infoCardData[0]
-                    val suSFS = infoCardData[1]
-                    val suSFSVersion = infoCardData[2]
-                    val suSFSVariant = infoCardData[3]
+                    val metaModule = getMetaModule()
                     val moduleViewModel: ModuleViewModel = viewModel()
                     val metaInfo = moduleViewModel.moduleList.firstOrNull { it.isMetaModule }
                     val metaDetail = if (metaInfo != null) " | ${metaInfo.name} | ${metaInfo.version}" else ""
@@ -1082,11 +1066,12 @@ private fun InfoCard(autoExpand: Boolean = false) {
                         icon = Icons.Filled.SettingsSuggest
                     )
 
+                    val suSFS = getSuSFS()
                     if (suSFS == "Supported") {
                         Spacer(Modifier.height(16.dp))
                         InfoCardItem(
                             label = stringResource(R.string.home_susfs_version),
-                            content = "${stringResource(R.string.supported)} | $suSFSVersion ($suSFSVariant)",
+                            content = "${stringResource(R.string.supported)} | ${getSuSFSVersion()} (${getSuSFSVariant()})",
                             icon = painterResource(R.drawable.ic_sus),
                         )
                     }
