@@ -990,20 +990,18 @@ fun ModuleItem(
                             alpha = 0.18f
                         )
                     } else {
-                        val bannerData = remember(module.banner) {
-                            try {
-                                val file = SuFile("/data/adb/modules/${module.id}/${module.banner}")
-                                return@remember file.newInputStream().use { it.readBytes() }
-                            } catch (_: Exception) {
+                        // SuFile reads route through the root shell — must not
+                        // run on the main thread during composition.
+                        val bannerData by produceState<ByteArray?>(initialValue = null, key1 = module.banner) {
+                            value = withContext(Dispatchers.IO) {
+                                runCatching {
+                                    SuFile("/data/adb/modules/${module.id}/${module.banner}")
+                                        .newInputStream().use { it.readBytes() }
+                                }.getOrNull() ?: runCatching {
+                                    SuFile("/data/adb/modules_update/${module.id}/${module.banner}")
+                                        .newInputStream().use { it.readBytes() }
+                                }.getOrNull()
                             }
-
-                            try {
-                                val file = SuFile("/data/adb/modules_update/${module.id}/${module.banner}")
-                                return@remember file.newInputStream().use { it.readBytes() }
-                            } catch (_: Exception) {
-                            }
-
-                            null
                         }
                         if (bannerData != null) {
                             AsyncImage(

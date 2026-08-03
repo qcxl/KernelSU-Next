@@ -4,8 +4,6 @@ import android.os.Parcelable
 import androidx.annotation.Keep
 import androidx.compose.runtime.Immutable
 import kotlinx.parcelize.Parcelize
-import java.io.BufferedReader
-import java.io.InputStreamReader
 
 /**
  * @author weishu
@@ -30,26 +28,11 @@ object Natives {
     const val ROOT_UID = 0
     const val ROOT_GID = 0
 
-    // Request KSU fd via reboot supercall (run in root shell to bypass seccomp).
-    // The helper binary lives at /data/local/tmp/ksu_fd_helper.
-    private fun requestKsuFd(): Int {
-        return try {
-            val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", "/data/local/tmp/ksu_fd_helper"))
-            val line = BufferedReader(InputStreamReader(proc.inputStream)).readLine()
-            proc.waitFor()
-            line?.trim()?.toIntOrNull() ?: -1
-        } catch (_: Exception) { -1 }
-    }
-
     init {
-        // Try to get KSU fd via root shell before loading native library.
-        // This must happen first because libkernelsu.so loaded into untrusted_app
-        // context can't call SYS_reboot (blocked by seccomp).
-        val ksuFd = requestKsuFd()
+        // libkernelsu.so in untrusted_app context cannot call SYS_reboot
+        // (blocked by seccomp); the native layer requests the KSU fd via
+        // the seccomp-safe prctl path in ksu.cc scan_driver_fd().
         System.loadLibrary("kernelsu")
-        if (ksuFd > 0) {
-            setKsuFd(ksuFd)
-        }
     }
 
     external fun setKsuFd(fd: Int)

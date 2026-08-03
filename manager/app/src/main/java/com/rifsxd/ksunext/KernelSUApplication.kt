@@ -62,6 +62,14 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
                             .header("Accept-Language", Locale.getDefault().toLanguageTag()).build()
                     )
                 }.build()
+
+        // Warm up the default root shell off the main thread. The first
+        // Shell.isAppGrantedRoot()/Shell.cmd() call lazily creates the
+        // shell synchronously (a full ksud startup round trip), which would
+        // otherwise block the first frame / first tab composition.
+        Thread {
+            runCatching { Shell.getShell() }
+        }.start()
     }
 
     override val viewModelStore: ViewModelStore

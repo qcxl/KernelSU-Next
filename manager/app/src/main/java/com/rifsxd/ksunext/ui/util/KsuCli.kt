@@ -22,6 +22,7 @@ import com.topjohnwu.superuser.io.SuFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.parcelize.Parcelize
+import kotlin.jvm.Volatile
 import org.json.JSONArray
 import java.io.File
 import java.text.SimpleDateFormat
@@ -99,20 +100,17 @@ fun execKsud(args: String, newShell: Boolean = false): Boolean {
 }
 
 suspend fun getFeatureStatus(feature: String): String = withContext(Dispatchers.IO) {
-    val shell = createRootShell(true)
-    
-    val out = shell.newJob()
-        .add("${getKsuDaemonPath()} feature check $feature").to(ArrayList<String>(), null).exec().out
+    // Reuse the cached default shell instead of spawning a new root shell
+    // per call (a new shell costs a full ksud startup round trip).
+    val out = Shell.cmd("${getKsuDaemonPath()} feature check $feature")
+        .to(ArrayList<String>(), null).exec().out
     out.firstOrNull()?.trim().orEmpty()
 }
 
 suspend fun getFeaturePersistValue(feature: String): Long? = withContext(Dispatchers.IO) {
-    val shell = createRootShell(true)
-    
-    // Read from kernel directly — kernel is source of truth for runtime state
-    // Config file persistence is only needed for boot-time init_features()
-    val out = shell.newJob()
-        .add("${getKsuDaemonPath()} feature get $feature").to(ArrayList<String>(), null).exec().out
+    // Reuse the cached default shell (see getFeatureStatus).
+    val out = Shell.cmd("${getKsuDaemonPath()} feature get $feature")
+        .to(ArrayList<String>(), null).exec().out
     val valueLine = out.firstOrNull { it.trim().startsWith("Value:") } ?: return@withContext null
     valueLine.substringAfter("Value:").trim().toLongOrNull()
 }
@@ -531,7 +529,18 @@ fun flashAnyKernelZip(
     }
 }
 
-fun rootAvailable() = Shell.isAppGrantedRoot() == true
+fun rootAvailable(): Boolean {
+    // Cache globally: root grant status is fixed for the app's lifetime.
+    // Recomputing it on every tab switch re-triggers Shell.isAppGrantedRoot()
+    // which can lazily (and synchronously) create the default shell.
+    rootAvailCached?.let { return it }
+    val ok = Shell.isAppGrantedRoot() == true
+    rootAvailCached = ok
+    return ok
+}
+
+@Volatile
+private var rootAvailCached: Boolean? = null
 
 fun isInitBoot(): Boolean {
     return !Os.uname().release.contains("android12-")

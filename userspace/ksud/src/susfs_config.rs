@@ -5,7 +5,6 @@
 
 use std::path::Path;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
 use anyhow::{Result, Context};
 use const_format::concatcp;
 use serde::{Serialize, Deserialize};
@@ -33,8 +32,11 @@ pub struct SusfsConfig {
 
 const CONFIG_PATH: &str = concatcp!(crate::defs::ADB_DIR, "ksu/susfs_config.json");
 
-/// 本进程启动后是否已恢复过（进程退出后自动清零）
-static RESTORED: AtomicBool = AtomicBool::new(false);
+/// 每 boot 只应用一次的标记文件。/dev 是 tmpfs，重启后自动清空，
+/// 因此该标记天然实现"每 boot 一次"语义（替代旧的进程内 AtomicBool，
+/// 后者在每次 ksud 命令都是独立进程时每次都会触发全量 apply，导致每条
+/// 命令都要做 ~19 次 resetprop 子进程 + 10 次 SUSFS ioctl，耗时 200-500ms）。
+const APPLY_MARKER: &str = "/dev/susfs_ksu_applied";
 
 /// 内置默认配置（格式 /data 后也自动生效）
 fn default_config() -> SusfsConfig {
@@ -175,15 +177,16 @@ pub fn apply(config: &SusfsConfig) {
     }
 }
 
-/// 在 CLI 入口处调用：每个进程生命周期内只恢复一次
+/// 在 CLI 入口处调用：每个 boot 只恢复一次（用 /dev 标记，重启即清空）。
+/// 注意：这里不能简单地用 is_boot_restored() 跳过整个 apply，
+/// 因为用户可能通过 `ksud susfs add-sus-path` 添加了自定义规则，
+/// 这些规则保存在 JSON 中，重启后需要重新应用。
+/// 内核 restore 只负责默认规则，用户自定义规则必须靠 JSON apply。
 pub fn restore_if_needed() {
-    if RESTORED.load(Ordering::Relaxed) {
+    // /dev 为 tmpfs，重启即清空，故该标记保证"每 boot 一次"
+    if Path::new(APPLY_MARKER).exists() {
         return;
     }
-    // 注意：这里不能简单地用 is_boot_restored() 跳过整个 apply，
-    // 因为用户可能通过 `ksud susfs add-sus-path` 添加了自定义规则，
-    // 这些规则保存在 JSON 中，重启后需要重新应用。
-    // 内核 restore 只负责默认规则，用户自定义规则必须靠 JSON apply。
     match load() {
         Ok(config) => {
             let has_rules = !config.sus_paths.is_empty()
@@ -207,7 +210,9 @@ pub fn restore_if_needed() {
             log::warn!("failed to load SUSFS config: {e:#}");
         }
     }
-    RESTORED.store(true, Ordering::Relaxed);
+    // 无论成功与否都标记已尝试，避免每条命令反复重试；
+    // 失败时用户可显式执行 `ksud susfs add-*` 手动重试。
+    let _ = std::fs::write(APPLY_MARKER, b"1");
 }
 
 /// 从当前 susfsd 模块读取状态构建配置（用于后续保存）

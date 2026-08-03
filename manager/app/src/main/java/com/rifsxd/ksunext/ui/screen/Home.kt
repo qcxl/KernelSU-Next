@@ -87,8 +87,19 @@ import com.rifsxd.ksunext.ui.trackScroll
 import com.rifsxd.ksunext.ui.rememberScrollConnection
 import java.util.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+
+// Aggregated SUSFS/metamodule info fetched off the main thread.
+private data class SusfsInfo(
+    val metaModule: String,
+    val suSFS: String,
+    val suSFSVersion: String,
+    val suSFSVariant: String
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Destination<RootGraph>(start = true)
@@ -318,9 +329,12 @@ private fun ModuleCard(onClick: (() -> Unit)? = null) {
     var moduleUpdateCount by remember { mutableStateOf(0) }
 
     LaunchedEffect(moduleViewModel.moduleList) {
-        moduleUpdateCount = moduleViewModel.moduleList.count {
-            moduleViewModel.checkUpdate(it).first.isNotEmpty()
-        }
+        val list = moduleViewModel.moduleList
+        // Run update checks concurrently instead of serially (each check is a
+        // network request); the badge only needs the count, not ordering.
+        moduleUpdateCount = coroutineScope {
+            list.map { async { moduleViewModel.checkUpdate(it) } }.awaitAll()
+        }.count { it.first.isNotEmpty() }
     }
 
     LaunchedEffect(moduleUpdateCount) {
@@ -1048,7 +1062,26 @@ private fun InfoCard(autoExpand: Boolean = false) {
                 }
 
                 if (ksuVersion != null) {
-                    val metaModule = getMetaModule()
+                    // Shell commands must not run on the main thread: each
+                    // ksud command costs a full root-shell round trip.
+                    val susfs by produceState(
+                        initialValue = SusfsInfo("", "", "", ""),
+                        key1 = ksuVersion
+                    ) {
+                        value = withContext(Dispatchers.IO) {
+                            SusfsInfo(
+                                getMetaModule(),
+                                getSuSFS(),
+                                getSuSFSVersion(),
+                                getSuSFSVariant()
+                            )
+                        }
+                    }
+                    val metaModule = susfs.metaModule
+                    val suSFS = susfs.suSFS
+                    val suSFSVersion = susfs.suSFSVersion
+                    val suSFSVariant = susfs.suSFSVariant
+
                     val moduleViewModel: ModuleViewModel = viewModel()
                     val metaInfo = moduleViewModel.moduleList.firstOrNull { it.isMetaModule }
                     val metaDetail = if (metaInfo != null) " | ${metaInfo.name} | ${metaInfo.version}" else ""
@@ -1066,12 +1099,11 @@ private fun InfoCard(autoExpand: Boolean = false) {
                         icon = Icons.Filled.SettingsSuggest
                     )
 
-                    val suSFS = getSuSFS()
                     if (suSFS == "Supported") {
                         Spacer(Modifier.height(16.dp))
                         InfoCardItem(
                             label = stringResource(R.string.home_susfs_version),
-                            content = "${stringResource(R.string.supported)} | ${getSuSFSVersion()} (${getSuSFSVariant()})",
+                            content = "${stringResource(R.string.supported)} | $suSFSVersion ($suSFSVariant)",
                             icon = painterResource(R.drawable.ic_sus),
                         )
                     }

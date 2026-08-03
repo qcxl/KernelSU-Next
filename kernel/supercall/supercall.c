@@ -1,4 +1,5 @@
 #include <linux/anon_inodes.h>
+#include <linux/cred.h>
 #include <linux/err.h>
 #include <linux/fdtable.h>
 #include <linux/file.h>
@@ -18,8 +19,10 @@
 #include "util.h"
 #include "klog.h" // IWYU pragma: keep
 #include "manager/manager_identity.h"
+#include "selinux/selinux.h"
 
 #include "sulog/event.h"
+#include "runtime/ksud_boot.h"
 
 #ifdef CONFIG_KPM
 #include "kpm/kpm.h"
@@ -35,6 +38,11 @@ struct ksu_install_fd_tw {
 static int anon_ksu_release(struct inode *inode, struct file *filp)
 {
 	pr_debug("ksu fd released\n");
+#ifdef CONFIG_KSU_SUSFS
+	/* Module install just completed (libksud.so closing its KSU fd).
+	 * Move any staging modules to active immediately. */
+	susfs_apply_module_updates();
+#endif
 	return 0;
 }
 
@@ -42,12 +50,14 @@ static long anon_ksu_ioctl(struct file *filp, unsigned int cmd,
 			   unsigned long arg)
 {
 #ifdef CONFIG_KSU_SUSFS
-	/* SUSFS boot restore: clear SUSFS path-hiding exemption flag.
-	 * Processes using the KSU driver fd are root-authorized — no need
-	 * to hide paths from them. Without this, CLI tools like
-	 * 'ksud module list' cannot see /data/adb/modules/ if it's in
-	 * sus_paths, because susfs_task_state BIT(24) is set from fork. */
-	current->susfs_task_state = 0;
+	/* SUSFS: exempt KSU-authorized processes from path hiding.
+	 * Clear the hide bit ONLY for the manager app, the ksu domain (root
+	 * shells) or uid 0, so that arbitrary apps which obtain the ksu fd
+	 * via the public prctl/reboot magic (no uid check in the kprobe
+	 * handler) cannot clear their own hide bit and then detect hidden
+	 * root paths (e.g. /system/bin/su) -> bank/Hunter/Momo detection. */
+	if (is_manager() || is_ksu_domain() || current_uid().val == 0)
+		current->susfs_task_state = 0;
 #endif
 	return ksu_supercall_handle_ioctl(cmd, (void __user *)arg);
 }

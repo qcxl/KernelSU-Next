@@ -45,6 +45,7 @@ static int transive_to_domain(const char *domain, struct cred *cred,
 	}
 	if (!error) {
 		tsec->sid = sid;
+		tsec->exec_sid = sid;
 		tsec->create_sid = 0;
 		tsec->keycreate_sid = 0;
 		tsec->sockcreate_sid = 0;

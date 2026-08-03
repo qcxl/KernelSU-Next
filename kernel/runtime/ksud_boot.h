@@ -6,6 +6,7 @@
 void on_post_fs_data(void);
 void on_module_mounted(void);
 void on_boot_completed(void);
+void susfs_apply_module_updates(void);
 
 bool ksu_is_safe_mode(void);
 
