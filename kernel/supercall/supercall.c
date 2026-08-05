@@ -33,11 +33,6 @@ struct ksu_install_fd_tw {
 static int anon_ksu_release(struct inode *inode, struct file *filp)
 {
 	pr_debug("ksu fd released\n");
-#ifdef CONFIG_KSU_SUSFS
-	/* Module install just completed (libksud.so closing its KSU fd).
-	 * Move any staging modules to active immediately. */
-	susfs_apply_module_updates();
-#endif
 	return 0;
 }
 

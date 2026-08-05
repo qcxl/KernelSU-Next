@@ -660,6 +660,17 @@ fn install_module_to_system(zip: &str) -> Result<()> {
     println!("- Module installed successfully!");
     info!("Module {module_id} installed successfully!");
 
+    // Move the freshly installed module from staging (modules_update/) to
+    // active (modules/) immediately. The kernel-side anon_ksu_release move
+    // hook fires on EVERY ksu fd close and can run multiple times during
+    // install, RENAME_EXCHANGE-ing the active dir against a partially
+    // written staging dir and corrupting module files (webroot/bin lost).
+    // Doing the move here in userspace (fscrypt key loaded, std::fs::rename
+    // atomic) makes the module complete and usable right after install.
+    if let Err(e) = handle_updated_modules() {
+        warn!("handle updated modules after install failed: {e}");
+    }
+
     Ok(())
 }
 
