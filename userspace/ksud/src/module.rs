@@ -69,6 +69,13 @@ pub fn get_common_script_envs(module_id: Option<&str>) -> Vec<(&'static str, Str
         ("KSU_VER", defs::VERSION_NAME.to_string()),
         ("KSU_UAPI_VER", ksucalls::uapi_version().to_string()),
         ("KSU_RUNTIME_MODE", ksucalls::runtime_mode().to_string()),
+        // KernelSU-Next has no built-in Zygisk injection. ReZygisk-style
+        // modules check $ZYGISK_ENABLED and skip starting their own daemon if
+        // it is set. The kernel umh environment that launches ksud (boot
+        // post-fs-data) can carry ZYGISK_ENABLED, which then leaks into module
+        // scripts via inherited env and makes them exit early (daemon never
+        // starts). Explicitly clear it so standalone Zygisk modules run.
+        ("ZYGISK_ENABLED", String::new()),
         (
             "PATH",
             format!(
