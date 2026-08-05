@@ -19,7 +19,6 @@
 #include "util.h"
 #include "klog.h" // IWYU pragma: keep
 #include "manager/manager_identity.h"
-#include "selinux/selinux.h"
 
 #include "sulog/event.h"
 #include "runtime/ksud_boot.h"
@@ -50,13 +49,18 @@ static long anon_ksu_ioctl(struct file *filp, unsigned int cmd,
 			   unsigned long arg)
 {
 #ifdef CONFIG_KSU_SUSFS
-	/* SUSFS: exempt KSU-authorized processes from path hiding.
-	 * Clear the hide bit ONLY for the manager app, the ksu domain (root
-	 * shells) or uid 0, so that arbitrary apps which obtain the ksu fd
-	 * via the public prctl/reboot magic (no uid check in the kprobe
-	 * handler) cannot clear their own hide bit and then detect hidden
-	 * root paths (e.g. /system/bin/su) -> bank/Hunter/Momo detection. */
-	if (is_manager() || is_ksu_domain() || current_uid().val == 0)
+	/* SUSFS: exempt root processes from path hiding so root shells and
+	 * ksud commands (all uid 0) can see hidden paths. Gated on uid 0 ONLY:
+	 * is_manager() is NOT reliable here — the CI kernel build (rifsxd
+	 * legacy + inject) reports the MANAGER flag for every uid, and even on
+	 * this dev source the manager appid can be invalid/unset. Arbitrary
+	 * apps can obtain the ksu fd via the public prctl/reboot magic (no uid
+	 * check in the kprobe handler), so gating on uid 0 means a non-root
+	 * app cannot clear its own hide bit and detect hidden root paths
+	 * (e.g. /system/bin/su) -> bank/Hunter/Momo. The manager app never
+	 * needs the clear: all its /data/adb and /system/bin/su access goes
+	 * through the root shell (uid 0). */
+	if (current_uid().val == 0)
 		current->susfs_task_state = 0;
 #endif
 	return ksu_supercall_handle_ioctl(cmd, (void __user *)arg);

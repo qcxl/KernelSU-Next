@@ -200,21 +200,11 @@ int escape_with_root_profile(void)
 	setup_mount_ns(profile->namespaces);
 	ksu_put_root_profile(profile);
 
-	/* KSU_ROOT_SHELL_CLEAR_STATE_INJECTED: clear the SUSFS path-
-	 * hiding bit so this KSU root shell is not hidden/killed by
-	 * SUS_PATH / SUS_MAP hiding (e.g. /system/bin/su). Without
-	 * this, `ksud debug su` spawns a root shell that gets SIGKILLed
-	 * when it touches hidden paths, breaking the manager app's root
-	 * shell / feature checks. */
-	#ifdef CONFIG_KSU_SUSFS
-	current->susfs_task_state = 0;
-	#endif
-
-	/* KSU root shell: clear the SUSFS path-hiding bit so this root
-	 * process is not hidden/killed by SUS_PATH / SUS_MAP hiding
-	 * (e.g. /system/bin/su). Without this, `ksud debug su` spawns a
-	 * root shell that gets SIGKILLed when it touches hidden paths,
-	 * breaking the manager app's root shell / feature checks. */
+	/* KSU_ROOT_SHELL_CLEAR_STATE_INJECTED: clear the SUSFS path-hiding
+	 * bit so this KSU root shell is not hidden/killed by SUS_PATH /
+	 * SUS_MAP hiding (e.g. /system/bin/su). Without this, `ksud debug su`
+	 * spawns a root shell that gets SIGKILLed when it touches hidden
+	 * paths, breaking the manager app's root shell / feature checks. */
 #ifdef CONFIG_KSU_SUSFS
 	current->susfs_task_state = 0;
 #endif
