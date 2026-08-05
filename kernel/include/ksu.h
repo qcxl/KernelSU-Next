@@ -8,10 +8,6 @@
 #define KERNEL_SU_VERSION KSU_VERSION
 #define KERNEL_SU_VERSION_TAG KSU_VERSION_TAG
 
-#ifndef KSU_VERSION_FULL
-#define KSU_VERSION_FULL KSU_VERSION_TAG "+dev"
-#endif
-
 extern struct cred *ksu_cred;
 extern bool ksu_late_loaded;
 extern bool allow_shell;

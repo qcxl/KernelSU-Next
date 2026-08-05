@@ -23,10 +23,6 @@
 #include "sulog/event.h"
 #include "runtime/ksud_boot.h"
 
-#ifdef CONFIG_KPM
-#include "kpm/kpm.h"
-#endif
-
 uint32_t ksuver_override = 0;
 
 struct ksu_install_fd_tw {

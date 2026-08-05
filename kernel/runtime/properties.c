@@ -18,11 +18,11 @@
 #include <linux/uaccess.h>
 
 /* ── Property area structures (bionic ABI) ───────────────────── */
-#define PROP_AREA_MAGIC       0x504F5250   /* "PROP" LE */
-#define PROP_AREA_HEADER_SZ   128
-#define PROP_TRIE_NODE_SZ     20
-#define PROP_NAME_MAX         32
-#define PROP_VALUE_MAX        92
+#define PROP_AREA_MAGIC 0x504F5250 /* "PROP" LE */
+#define PROP_AREA_HEADER_SZ 128
+#define PROP_TRIE_NODE_SZ 20
+#define PROP_NAME_MAX 32
+#define PROP_VALUE_MAX 92
 
 /* Header of /dev/__properties__ shared memory file (128 bytes) */
 struct prop_area_header {
@@ -36,7 +36,7 @@ struct prop_area_header {
 /* Trie node (20-byte header + variable-length name) */
 struct prop_trie_node {
 	uint32_t namelen;
-	uint32_t prop;       /* offset to prop_info, or 0 */
+	uint32_t prop; /* offset to prop_info, or 0 */
 	uint32_t left;
 	uint32_t right;
 	uint32_t children;
@@ -46,18 +46,20 @@ struct prop_trie_node {
 /* Property record (96-byte header + variable-length name) */
 struct prop_info_rec {
 	uint32_t serial;
-	char     value[PROP_VALUE_MAX];
+	char value[PROP_VALUE_MAX];
 	/* char name[] follows */
 };
 
 /* ── Trie walk ──────────────────────────────────────────────── */
 /* Property name comparison: LENGTH FIRST, then byte comparison.
  * This matches bionic's cmp_prop_name(). */
-static int prop_name_cmp(const char *key, int key_len,
-			 const char *node_name, int node_len)
+static int prop_name_cmp(const char *key, int key_len, const char *node_name,
+			 int node_len)
 {
-	if (key_len < node_len) return -1;
-	if (key_len > node_len) return  1;
+	if (key_len < node_len)
+		return -1;
+	if (key_len > node_len)
+		return 1;
 	return memcmp(key, node_name, key_len);
 }
 
@@ -129,8 +131,8 @@ static struct file *try_context(const char *context, const char *key,
 	uint8_t *page = NULL;
 	uint32_t info_off;
 
-	snprintf(path, sizeof(path),
-		 "/dev/__properties__/u:object_r:%s:s0", context);
+	snprintf(path, sizeof(path), "/dev/__properties__/u:object_r:%s:s0",
+		 context);
 	fp = filp_open(path, O_RDWR, 0);
 	if (IS_ERR(fp))
 		return NULL;
@@ -172,12 +174,8 @@ static struct file *try_context(const char *context, const char *key,
  * bootloader_prop:        ro.boot.verifiedbootstate, ro.boot.type, etc.
  * build_bootimage_prop:   ro.bootimage.build.type, etc. */
 static const char *prop_contexts[] = {
-	"build_prop",
-	"userdebug_or_eng_prop",
-	"default_prop",
-	"bootloader_prop",
-	"build_bootimage_prop",
-	NULL,
+	"build_prop",	   "userdebug_or_eng_prop", "default_prop",
+	"bootloader_prop", "build_bootimage_prop",  NULL,
 };
 
 /* ── Property set / delete ──────────────────────────────────── */
@@ -192,8 +190,8 @@ int property_set(const char *key, const char *value)
 	int i;
 
 	for (i = 0; prop_contexts[i]; i++) {
-		fp = try_context(prop_contexts[i], key, &page,
-				 &page_size, &info_off);
+		fp = try_context(prop_contexts[i], key, &page, &page_size,
+				 &info_off);
 		if (fp)
 			break;
 	}
@@ -228,8 +226,8 @@ int property_set(const char *key, const char *value)
 		kernel_write(fp, &serial, sizeof(serial), &pos);
 	}
 
-	pr_info("susfs: property_set '%s' = '%s' (context=%s)\n",
-		key, value, prop_contexts[i]);
+	pr_info("susfs: property_set '%s' = '%s' (context=%s)\n", key, value,
+		prop_contexts[i]);
 	ret = 0;
 
 	kfree(page);
@@ -240,28 +238,28 @@ int property_set(const char *key, const char *value)
 /* ── Master entry point called from boot_event.c ─────────────── */
 void susfs_restore_properties(void)
 {
-	static const char * const set_props[][2] = {
-		{ "ro.build.type",             "user" },
-		{ "ro.build.flavor",           "OnePlus8T-user" },
-		{ "ro.build.display.id",       "RKQ1.211119.001" },
-		{ "ro.debuggable",             "0" },
-		{ "ro.build.user",             "jenkins" },
-		{ "ro.build.host",             "rd-build-193" },
+	static const char *const set_props[][2] = {
+		{ "ro.build.type", "user" },
+		{ "ro.build.flavor", "OnePlus8T-user" },
+		{ "ro.build.display.id", "RKQ1.211119.001" },
+		{ "ro.debuggable", "0" },
+		{ "ro.build.user", "jenkins" },
+		{ "ro.build.host", "rd-build-193" },
 		{ "ro.boot.verifiedbootstate", "green" },
-		{ "ro.bootimage.build.type",   "user" },
-		{ "ro.boot.type",              "release" },
+		{ "ro.bootimage.build.type", "user" },
+		{ "ro.boot.type", "release" },
 		/* Clear lineage props with empty string instead of deleting.
 		 * Deleting zeroes the name's first byte creating a "hole" in
 		 * the trie, which Hunter detects as "Find Prop Modify Mark". */
-		{ "ro.lineage.version",               "" },
-		{ "ro.lineage.build.version",         "" },
+		{ "ro.lineage.version", "" },
+		{ "ro.lineage.build.version", "" },
 		{ "ro.lineage.build.version.plat.rev", "" },
 		{ "ro.lineage.build.version.plat.sdk", "" },
-		{ "ro.lineage.device",                "" },
-		{ "ro.lineage.display.version",       "" },
-		{ "ro.lineage.releasetype",           "" },
-		{ "ro.lineagelegal.url",              "" },
-		{ "ro.modversion",                    "" },
+		{ "ro.lineage.device", "" },
+		{ "ro.lineage.display.version", "" },
+		{ "ro.lineage.releasetype", "" },
+		{ "ro.lineagelegal.url", "" },
+		{ "ro.modversion", "" },
 		{ NULL, NULL },
 	};
 	int i;

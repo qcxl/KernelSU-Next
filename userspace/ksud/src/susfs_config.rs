@@ -10,7 +10,6 @@ use const_format::concatcp;
 use serde::{Serialize, Deserialize};
 
 use crate::susfsd;
-use crate::defs;
 
 /// SUSFS 持久化配置
 #[derive(Serialize, Deserialize, Clone, Default)]

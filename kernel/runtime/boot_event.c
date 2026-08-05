@@ -97,7 +97,7 @@ static void susfs_restore_boot(void)
 	int i;
 
 	{
-		static const char * const paths[] = {
+		static const char *const paths[] = {
 			"/system/bin/su",
 			"/odm/bin/su",
 			"/data/adb/ksu/su",
@@ -113,7 +113,7 @@ static void susfs_restore_boot(void)
 			susfs_add_sus_path_kernel(paths[i]);
 	}
 	{
-		static const char * const maps[] = {
+		static const char *const maps[] = {
 			"/data/adb/",
 			NULL,
 		};
@@ -121,7 +121,7 @@ static void susfs_restore_boot(void)
 			susfs_mark_inode_sus_map(maps[i]);
 	}
 	{
-		static const char * const mounts[] = {
+		static const char *const mounts[] = {
 			"/vendor",
 			"/odm",
 			NULL,
@@ -170,7 +170,8 @@ static int susfs_rename_one(const char *name, int namlen)
 	struct dentry *new_dentry;
 	int err;
 
-	scnprintf(old_path, sizeof(old_path), "/data/adb/modules_update/%s", name);
+	scnprintf(old_path, sizeof(old_path), "/data/adb/modules_update/%s",
+		  name);
 	scnprintf(new_path, sizeof(new_path), "/data/adb/modules/%s", name);
 
 	err = kern_path(old_path, 0, &old_p);
@@ -202,8 +203,8 @@ static int susfs_rename_one(const char *name, int namlen)
 	} else {
 		/* Target doesn't exist → simple rename */
 		err = vfs_rename(old_p.dentry->d_parent->d_inode, old_p.dentry,
-				 modules_dir.dentry->d_inode, new_dentry,
-				 NULL, 0);
+				 modules_dir.dentry->d_inode, new_dentry, NULL,
+				 0);
 	}
 
 	dput(new_dentry);
