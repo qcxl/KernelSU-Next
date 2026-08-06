@@ -163,11 +163,46 @@ fn rezygisk_selfheal() {
 
     let _ = std::fs::write(mark, b"1");
     info!("rezygisk: missed zygote, restarting zygote once to complete injection");
-    let _ = sys_prop::init();
-    let rp = resetprop();
-    if let Err(e) = rp.set("ctl.restart", "zygote") {
-        warn!("rezygisk: failed to set ctl.restart zygote: {e:#}");
+
+    // The monitor must have finished ptrace-attaching init BEFORE we restart
+    // zygote, otherwise it misses the new fork again. Poll init's TracerPid
+    // for up to ~10s.
+    for _ in 0..20 {
+        if process_name_exists("zygisk-ptrace")
+            && init_is_traced()
+        {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(500));
     }
+
+    // IMPORTANT: trigger the restart through the property service (setprop
+    // binary). ResetProp::set() writes the property shared memory directly,
+    // which init does NOT monitor for ctl.* control properties, so the
+    // zygote would never restart.
+    match std::process::Command::new("setprop")
+        .args(["ctl.restart", "zygote"])
+        .status()
+    {
+        Ok(st) if st.success() => {}
+        Ok(st) => warn!(
+            "rezygisk: setprop ctl.restart zygote exited {}",
+            st.code().unwrap_or(-1)
+        ),
+        Err(e) => warn!("rezygisk: failed to run setprop ctl.restart zygote: {e:#}"),
+    }
+}
+
+/// True if init (pid 1) currently has a ptrace tracer attached (i.e. the
+/// ReZygisk monitor finished seizing init).
+fn init_is_traced() -> bool {
+    let Ok(status) = std::fs::read_to_string("/proc/1/status") else {
+        return false;
+    };
+    status.lines().find_map(|l| l.strip_prefix("TracerPid:\t"))
+        .and_then(|v| v.trim().parse::<u32>().ok())
+        .map(|v| v != 0)
+        .unwrap_or(false)
 }
 
 /// True if any process comm starts with `name` (e.g. "zygiskd" matches
