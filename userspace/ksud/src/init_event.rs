@@ -134,9 +134,47 @@ pub fn on_post_data_fs() -> Result<()> {
 
     run_stage("post-mount", true);
 
+    // ReZygisk self-heal, independent of init.rc injection: the
+    // read_proxy-injected `on property:sys.boot_completed=1` hook is
+    // unreliable on this device (verified: ksud boot-completed never ran
+    // even though sys.boot_completed=1). Spawn a detached shell that waits
+    // for boot-completed, then restarts zygote once if ReZygisk missed the
+    // early zygote fork. Restarting zygote at boot-completed is the safe
+    // soft restart (verified on-device); during post-fs-data it caused a
+    // watchdog full-reboot loop, so we must not do it earlier.
+    spawn_rezygisk_selfheal();
+
     std::env::set_current_dir("/").with_context(|| "failed to chdir to /")?;
 
     Ok(())
+}
+
+/// Spawn a detached shell that performs the ReZygisk self-heal once
+/// sys.boot_completed=1 (survives ksud exit as an orphan).
+fn spawn_rezygisk_selfheal() {
+    const SCRIPT: &str = r#"#!/system/bin/sh
+# ReZygisk self-heal: wait for full boot, then restart zygote once if the
+# ptrace monitor missed the zygote fork (KSUN post-fs-data runs after
+# zygote on kebab). No-op when ReZygisk is absent / already injected.
+while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 5; done
+sleep 5
+[ -f /data/adb/modules/rezygisk/module.prop ] || exit 0
+[ -f /dev/rezygisk_zygote_restarted ] && exit 0
+ps -A 2>/dev/null | grep -q zygiskd && exit 0
+touch /dev/rezygisk_zygote_restarted
+log -p i -t rezygisk-selfheal "ReZygisk missed zygote, restarting zygote once"
+setprop ctl.restart zygote
+"#;
+    if let Err(e) = std::process::Command::new("sh")
+        .arg("-c")
+        .arg(SCRIPT)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+    {
+        warn!("rezygisk: failed to spawn self-heal script: {e:#}");
+    }
 }
 
 /// ReZygisk self-heal (see call site above for rationale).
