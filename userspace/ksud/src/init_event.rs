@@ -134,16 +134,6 @@ pub fn on_post_data_fs() -> Result<()> {
 
     run_stage("post-mount", true);
 
-    // ReZygisk self-heal: if ReZygisk is installed but its ptrace monitor
-    // missed the zygote fork (KSUN's post-fs-data runs after zygote on this
-    // device), restart zygote once per boot so the injection completes.
-    // zygote restart is Android's official soft restart; SUSFS hiding is
-    // unaffected. No-op when ReZygisk is absent or already working, so
-    // normal boots are untouched.
-    utils::kmsg_dbg("before selfheal");
-    rezygisk_selfheal();
-    utils::kmsg_dbg("after selfheal");
-
     std::env::set_current_dir("/").with_context(|| "failed to chdir to /")?;
 
     Ok(())
@@ -274,6 +264,15 @@ pub fn on_services() {
 }
 
 pub fn on_boot_completed() {
+    // ReZygisk self-heal: restart zygote once per boot, but ONLY after the
+    // system is fully booted. Restarting zygote during post-fs-data (early
+    // boot, ~40s) crashes the still-initialising system_server and triggers
+    // a watchdog full reboot loop; at boot-completed the restart is the
+    // safe soft restart verified on-device.
+    utils::kmsg_dbg("on_boot_completed: before selfheal");
+    rezygisk_selfheal();
+    utils::kmsg_dbg("on_boot_completed: after selfheal");
+
     if let Err(e) = ksucalls::ensure_uapi_version_matched() {
         error!("{e:#}, skip on_boot_completed");
         return;
