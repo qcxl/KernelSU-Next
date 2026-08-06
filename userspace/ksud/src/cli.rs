@@ -597,8 +597,20 @@ pub fn run() -> Result<()> {
     susfs_config::restore_if_needed();
     crate::utils::kmsg_dbg("cli: after restore_if_needed");
 
-    let cli = Args::parse();
-    crate::utils::kmsg_dbg(&format!("cli: parsed {:?}", cli.command));
+    crate::utils::kmsg_dbg(&format!(
+        "cli: argv={:?}",
+        std::env::args().collect::<Vec<_>>()
+    ));
+    let cli = match Args::try_parse() {
+        Ok(cli) => {
+            crate::utils::kmsg_dbg(&format!("cli: parsed {:?}", cli.command));
+            cli
+        }
+        Err(e) => {
+            crate::utils::kmsg_dbg(&format!("cli: parse error: {e}"));
+            return Err(e.into());
+        }
+    };
 
     log::info!("command: {:?}", cli.command);
 
