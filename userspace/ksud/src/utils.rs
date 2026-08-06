@@ -335,3 +335,12 @@ pub fn detach_process_group(use_init_pgrp: bool) {
         log::error!("failed to set process group: {e2:?}");
     }
 }
+
+/// Write a debug line to the kernel log (dmesg). Used for diagnosing the
+/// early umh-spawned ksud where logcat may not be ready yet.
+pub fn kmsg_dbg(msg: &str) {
+    use std::io::Write;
+    if let Ok(mut f) = std::fs::OpenOptions::new().write(true).open("/dev/kmsg") {
+        let _ = f.write_all(format!("ksud-dbg: {msg}\n").as_bytes());
+    }
+}

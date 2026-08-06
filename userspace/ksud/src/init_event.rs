@@ -14,16 +14,21 @@ use std::path::Path;
 use std::process::Command;
 
 pub fn on_post_data_fs() -> Result<()> {
+    utils::kmsg_dbg("on_post_data_fs enter");
     if let Err(e) = ksucalls::ensure_uapi_version_matched() {
+        utils::kmsg_dbg(&format!("uapi err: {e:#}"));
         // Degrade instead of skipping: the umh-spawned early ksud can hit a
         // transient get_info() failure (stale driver fd, see ksucalls.rs),
         // and skipping here disables module mounting / post-fs-data.d /
         // module stage scripts entirely. Every later step has its own error
         // handling, so continuing is safe even if the mismatch is real.
         error!("{e:#}, continuing on_post_fs_data in degraded mode");
+    } else {
+        utils::kmsg_dbg("uapi ok");
     }
 
     ksucalls::report_post_fs_data();
+    utils::kmsg_dbg("after report_post_fs_data");
 
     utils::umask(0);
 
@@ -36,6 +41,7 @@ pub fn on_post_data_fs() -> Result<()> {
     let _ = catch_bootlog("logcat", &["logcat", "-b", "all"]);
     #[cfg(unix)]
     let _ = catch_bootlog("dmesg", &["dmesg", "-w", "-r"]);
+    utils::kmsg_dbg("after catch_bootlog");
 
     if utils::has_magisk() {
         warn!("Magisk detected, skip post-fs-data!");
@@ -103,6 +109,7 @@ pub fn on_post_data_fs() -> Result<()> {
         warn!("init features failed: {e}");
     }
 
+    utils::kmsg_dbg("before module scripts");
     // execute metamodule post-fs-data script first (priority)
     if let Err(e) = metamodule::exec_stage_script("post-fs-data", true) {
         warn!("exec metamodule post-fs-data script failed: {e}");
@@ -113,6 +120,7 @@ pub fn on_post_data_fs() -> Result<()> {
     if let Err(e) = crate::module::exec_stage_script("post-fs-data", true) {
         warn!("exec post-fs-data scripts failed: {e}");
     }
+    utils::kmsg_dbg("after module scripts");
 
     // load system.prop
     if let Err(e) = crate::module::load_system_prop() {
@@ -132,7 +140,9 @@ pub fn on_post_data_fs() -> Result<()> {
     // zygote restart is Android's official soft restart; SUSFS hiding is
     // unaffected. No-op when ReZygisk is absent or already working, so
     // normal boots are untouched.
+    utils::kmsg_dbg("before selfheal");
     rezygisk_selfheal();
+    utils::kmsg_dbg("after selfheal");
 
     std::env::set_current_dir("/").with_context(|| "failed to chdir to /")?;
 

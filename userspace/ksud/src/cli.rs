@@ -595,8 +595,10 @@ pub fn run() -> Result<()> {
 
     // 新启动后首次执行 ksud → 恢复 SUSFS 配置
     susfs_config::restore_if_needed();
+    crate::utils::kmsg_dbg("cli: after restore_if_needed");
 
     let cli = Args::parse();
+    crate::utils::kmsg_dbg(&format!("cli: parsed {:?}", cli.command));
 
     log::info!("command: {:?}", cli.command);
 
