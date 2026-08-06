@@ -602,11 +602,13 @@ pub fn run() -> Result<()> {
         std::env::args().collect::<Vec<_>>()
     ));
     let cli = match Args::try_parse() {
-        Ok(cli) => {
+        // NOTE: `Ok`/`Err` are shadowed by anyhow's imports in this file,
+        // so fully-qualified std paths are required in patterns.
+        std::result::Result::Ok(cli) => {
             crate::utils::kmsg_dbg(&format!("cli: parsed {:?}", cli.command));
             cli
         }
-        Err(e) => {
+        std::result::Result::Err(e) => {
             crate::utils::kmsg_dbg(&format!("cli: parse error: {e}"));
             return Err(e.into());
         }
