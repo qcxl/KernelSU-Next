@@ -4,11 +4,14 @@ use anyhow::bail;
 use crate::ksu_uapi;
 use std::fs;
 use std::os::fd::RawFd;
-use std::sync::OnceLock;
+use std::sync::atomic::{AtomicI32, Ordering};
 
-// Global driver fd cache
-static DRIVER_FD: OnceLock<RawFd> = OnceLock::new();
-static INFO_CACHE: OnceLock<ksu_uapi::ksu_get_info_cmd> = OnceLock::new();
+// Global driver fd cache. Atomic so a stale (closed) fd can be reset and
+// re-acquired on EBADF. The old OnceLock permanently cached a dead fd (or
+// -1), which broke every later ioctl for the rest of the process lifetime
+// and disabled the whole post-fs-data flow when the early umh-spawned ksud
+// hit a transient fd problem.
+static DRIVER_FD: AtomicI32 = AtomicI32::new(-1);
 
 fn scan_driver_fd() -> Option<RawFd> {
     let fd_dir = fs::read_dir("/proc/self/fd").ok()?;
@@ -64,15 +67,45 @@ fn init_driver_fd() -> Option<RawFd> {
     }
 }
 
+fn get_driver_fd() -> RawFd {
+    let cached = DRIVER_FD.load(Ordering::Relaxed);
+    if cached >= 0 {
+        return cached;
+    }
+    if let Some(fd) = init_driver_fd() {
+        DRIVER_FD.store(fd, Ordering::Relaxed);
+        fd
+    } else {
+        -1
+    }
+}
+
 // ioctl wrapper using libc
 pub(crate) fn ksuctl<T>(request: u32, arg: *mut T) -> std::io::Result<i32> {
     use std::io;
 
-    let fd = *DRIVER_FD.get_or_init(|| init_driver_fd().unwrap_or(-1));
+    let mut fd = get_driver_fd();
+    if fd < 0 {
+        return Err(io::Error::from_raw_os_error(libc::EBADF));
+    }
     unsafe {
         let ret = libc::ioctl(fd as libc::c_int, request as i32, arg);
         if ret < 0 {
-            Err(io::Error::last_os_error())
+            let err = io::Error::last_os_error();
+            // The cached fd may have been closed underneath us; drop it and
+            // re-acquire once before giving up.
+            if err.raw_os_error() == Some(libc::EBADF) {
+                libc::close(fd);
+                DRIVER_FD.store(-1, Ordering::Relaxed);
+                fd = get_driver_fd();
+                if fd >= 0 {
+                    let ret2 = libc::ioctl(fd as libc::c_int, request as i32, arg);
+                    if ret2 >= 0 {
+                        return Ok(ret2);
+                    }
+                }
+            }
+            Err(err)
         } else {
             Ok(ret)
         }
@@ -81,18 +114,19 @@ pub(crate) fn ksuctl<T>(request: u32, arg: *mut T) -> std::io::Result<i32> {
 
 // API implementations
 pub fn get_info() -> ksu_uapi::ksu_get_info_cmd {
-    *INFO_CACHE.get_or_init(|| {
-        let mut cmd = ksu_uapi::ksu_get_info_cmd {
-            version: 0,
-            flags: 0,
-            features: 0,
-            uapi_version: 0,
-        };
-        if ksuctl(ksu_uapi::KSU_IOCTL_GET_INFO, &raw mut cmd).is_err() {
-            let _ = ksuctl(ksu_uapi::KSU_IOCTL_GET_INFO_LEGACY, &raw mut cmd);
-        }
-        cmd
-    })
+    // Always query the kernel instead of caching: a cached all-zero struct
+    // (from a transient ioctl failure) would make ensure_uapi_version_matched()
+    // bail forever, disabling the whole post-fs-data flow.
+    let mut cmd = ksu_uapi::ksu_get_info_cmd {
+        version: 0,
+        flags: 0,
+        features: 0,
+        uapi_version: 0,
+    };
+    if ksuctl(ksu_uapi::KSU_IOCTL_GET_INFO, &raw mut cmd).is_err() {
+        let _ = ksuctl(ksu_uapi::KSU_IOCTL_GET_INFO_LEGACY, &raw mut cmd);
+    }
+    cmd
 }
 
 pub fn get_version() -> i32 {

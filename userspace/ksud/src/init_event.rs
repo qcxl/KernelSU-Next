@@ -15,8 +15,12 @@ use std::process::Command;
 
 pub fn on_post_data_fs() -> Result<()> {
     if let Err(e) = ksucalls::ensure_uapi_version_matched() {
-        error!("{e:#}, skip on_post_fs_data");
-        return Ok(());
+        // Degrade instead of skipping: the umh-spawned early ksud can hit a
+        // transient get_info() failure (stale driver fd, see ksucalls.rs),
+        // and skipping here disables module mounting / post-fs-data.d /
+        // module stage scripts entirely. Every later step has its own error
+        // handling, so continuing is safe even if the mismatch is real.
+        error!("{e:#}, continuing on_post_fs_data in degraded mode");
     }
 
     ksucalls::report_post_fs_data();
@@ -122,9 +126,68 @@ pub fn on_post_data_fs() -> Result<()> {
 
     run_stage("post-mount", true);
 
+    // ReZygisk self-heal: if ReZygisk is installed but its ptrace monitor
+    // missed the zygote fork (KSUN's post-fs-data runs after zygote on this
+    // device), restart zygote once per boot so the injection completes.
+    // zygote restart is Android's official soft restart; SUSFS hiding is
+    // unaffected. No-op when ReZygisk is absent or already working, so
+    // normal boots are untouched.
+    rezygisk_selfheal();
+
     std::env::set_current_dir("/").with_context(|| "failed to chdir to /")?;
 
     Ok(())
+}
+
+/// ReZygisk self-heal (see call site above for rationale).
+fn rezygisk_selfheal() {
+    // Only act when ReZygisk is installed
+    if !Path::new("/data/adb/modules/rezygisk/module.prop").exists() {
+        return;
+    }
+
+    // Once per boot only. The marker lives in /dev (tmpfs), so it is
+    // cleared on every reboot — zygote must be restarted on every boot
+    // because the monitor always misses the early zygote fork here.
+    let mark = "/dev/rezygisk_zygote_restarted";
+    if Path::new(mark).exists() {
+        return;
+    }
+
+    // zygiskd running means the monitor caught the zygote this boot;
+    // nothing to do. (state.json is NOT a reliable signal: it may be a
+    // stale file left over from the previous boot.)
+    if process_name_exists("zygiskd") {
+        return;
+    }
+
+    let _ = std::fs::write(mark, b"1");
+    info!("rezygisk: missed zygote, restarting zygote once to complete injection");
+    let _ = sys_prop::init();
+    let rp = resetprop();
+    if let Err(e) = rp.set("ctl.restart", "zygote") {
+        warn!("rezygisk: failed to set ctl.restart zygote: {e:#}");
+    }
+}
+
+/// True if any process comm starts with `name` (e.g. "zygiskd" matches
+/// zygiskd64/zygiskd32).
+fn process_name_exists(name: &str) -> bool {
+    let Ok(entries) = std::fs::read_dir("/proc") else {
+        return false;
+    };
+    for entry in entries.flatten() {
+        let pid = entry.file_name().to_string_lossy().to_string();
+        if !pid.chars().all(|c| c.is_ascii_digit()) {
+            continue;
+        }
+        if let Ok(comm) = std::fs::read_to_string(format!("/proc/{pid}/comm")) {
+            if comm.trim().starts_with(name) {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 pub fn run_stage(stage: &str, block: bool) {
