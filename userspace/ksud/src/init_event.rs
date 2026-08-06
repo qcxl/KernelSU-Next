@@ -153,16 +153,20 @@ pub fn on_post_data_fs() -> Result<()> {
 /// sys.boot_completed=1 (survives ksud exit as an orphan).
 fn spawn_rezygisk_selfheal() {
     const SCRIPT: &str = r#"#!/system/bin/sh
-# ReZygisk self-heal: wait for full boot, then restart zygote once if the
-# ptrace monitor missed the zygote fork (KSUN post-fs-data runs after
-# zygote on kebab). No-op when ReZygisk is absent / already injected.
+# ReZygisk self-heal: wait for full boot + grace period, then restart
+# zygote once if the ptrace monitor missed the zygote fork (KSUN
+# post-fs-data runs after zygote on kebab). No-op when ReZygisk is
+# absent / already injected. The grace period matters: restarting zygote
+# too early (during/right after boot-completed, system_server still
+# settling) triggered a watchdog full reboot on this device; at ~2min
+# after boot it is the safe soft restart verified earlier.
 while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 5; done
-sleep 5
+sleep 120
 [ -f /data/adb/modules/rezygisk/module.prop ] || exit 0
 [ -f /dev/rezygisk_zygote_restarted ] && exit 0
 ps -A 2>/dev/null | grep -q zygiskd && exit 0
 touch /dev/rezygisk_zygote_restarted
-log -p i -t rezygisk-selfheal "ReZygisk missed zygote, restarting zygote once"
+log -p i -t rezygisk-selfheal "ReZygisk missed zygote, restarting zygote once (grace elapsed)"
 setprop ctl.restart zygote
 "#;
     if let Err(e) = std::process::Command::new("sh")
