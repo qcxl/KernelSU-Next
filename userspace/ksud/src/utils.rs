@@ -341,7 +341,9 @@ pub fn detach_process_group(use_init_pgrp: bool) {
 pub fn kmsg_dbg(msg: &str) {
     use std::io::Write;
     let file = std::fs::OpenOptions::new().write(true).open("/dev/kmsg");
-    if let Ok(mut f) = file {
+    // NOTE: `Ok` is shadowed by anyhow's `Ok` import at the top of this
+    // file, so the fully-qualified std path is required in the pattern.
+    if let std::result::Result::Ok(mut f) = file {
         let _ = f.write_all(format!("ksud-dbg: {msg}\n").as_bytes());
     }
 }
