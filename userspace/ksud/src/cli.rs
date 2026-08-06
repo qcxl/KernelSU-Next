@@ -601,16 +601,27 @@ pub fn run() -> Result<()> {
         "cli: argv={:?}",
         std::env::args().collect::<Vec<_>>()
     ));
-    let cli = match Args::try_parse() {
-        // NOTE: `Ok`/`Err` are shadowed by anyhow's imports in this file,
-        // so fully-qualified std paths are required in patterns.
-        std::result::Result::Ok(cli) => {
-            crate::utils::kmsg_dbg(&format!("cli: parsed {:?}", cli.command));
-            cli
+    // The SUSFS boot-restore usermodehelper (call_usermodehelper with
+    // CONFIG_STATIC_USERMODEHELPER) drops the subcommand argument and execs
+    // us with only argv[0]. Its only purpose is post-fs-data, so default to
+    // that when no subcommand is present.
+    let cli = if std::env::args().len() <= 1 {
+        crate::utils::kmsg_dbg("cli: no subcommand, defaulting to post-fs-data");
+        Args {
+            command: Commands::PostFsData,
         }
-        std::result::Result::Err(e) => {
-            crate::utils::kmsg_dbg(&format!("cli: parse error: {e}"));
-            return Err(e.into());
+    } else {
+        match Args::try_parse() {
+            // NOTE: `Ok`/`Err` are shadowed by anyhow's imports in this
+            // file, so fully-qualified std paths are required in patterns.
+            std::result::Result::Ok(cli) => {
+                crate::utils::kmsg_dbg(&format!("cli: parsed {:?}", cli.command));
+                cli
+            }
+            std::result::Result::Err(e) => {
+                crate::utils::kmsg_dbg(&format!("cli: parse error: {e}"));
+                return Err(e.into());
+            }
         }
     };
 
