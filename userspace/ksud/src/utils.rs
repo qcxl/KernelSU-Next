@@ -340,7 +340,8 @@ pub fn detach_process_group(use_init_pgrp: bool) {
 /// early umh-spawned ksud where logcat may not be ready yet.
 pub fn kmsg_dbg(msg: &str) {
     use std::io::Write;
-    if let Ok(mut f) = std::fs::OpenOptions::new().write(true).open("/dev/kmsg") {
+    let file = std::fs::OpenOptions::new().write(true).open("/dev/kmsg");
+    if let Ok(mut f) = file {
         let _ = f.write_all(format!("ksud-dbg: {msg}\n").as_bytes());
     }
 }
