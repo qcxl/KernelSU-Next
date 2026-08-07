@@ -164,7 +164,7 @@ while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 5; done
 sleep 120
 [ -f /data/adb/modules/rezygisk/module.prop ] || exit 0
 [ -f /dev/rezygisk_zygote_restarted ] && exit 0
-ps -A 2>/dev/null | grep -q zygiskd && exit 0
+ps -A 2>/dev/null | grep -qE 'zygiskd|zyg_aux' && exit 0
 touch /dev/rezygisk_zygote_restarted
 log -p i -t rezygisk-selfheal "ReZygisk missed zygote, restarting zygote once (grace elapsed)"
 setprop ctl.restart zygote
@@ -196,10 +196,10 @@ fn rezygisk_selfheal() {
         return;
     }
 
-    // zygiskd running means the monitor caught the zygote this boot;
-    // nothing to do. (state.json is NOT a reliable signal: it may be a
-    // stale file left over from the previous boot.)
-    if process_name_exists("zygiskd") {
+    // zygiskd/zyg_aux running means the monitor caught the zygote this
+    // boot; nothing to do. (state.json is NOT a reliable signal: it may
+    // be a stale file left over from the previous boot.)
+    if process_name_exists("zygiskd") || process_name_exists("zyg_aux") {
         return;
     }
 
@@ -210,7 +210,7 @@ fn rezygisk_selfheal() {
     // zygote, otherwise it misses the new fork again. Poll init's TracerPid
     // for up to ~10s.
     for _ in 0..20 {
-        if process_name_exists("zygisk-ptrace")
+        if (process_name_exists("zygisk-ptrace") || process_name_exists("zygote_second"))
             && init_is_traced()
         {
             break;
