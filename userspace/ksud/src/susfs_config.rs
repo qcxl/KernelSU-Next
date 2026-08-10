@@ -182,9 +182,21 @@ pub fn apply(config: &SusfsConfig) {
 /// 这些规则保存在 JSON 中，重启后需要重新应用。
 /// 内核 restore 只负责默认规则，用户自定义规则必须靠 JSON apply。
 pub fn restore_if_needed() {
-    // /dev 为 tmpfs，重启即清空，故该标记保证"每 boot 一次"
-    if Path::new(APPLY_MARKER).exists() {
-        return;
+    // /dev 为 tmpfs，重启即清空，故该标记保证"每 boot 一次"。
+    // 注意：不能用 Path::exists() —— KSUN App 内嵌 libksud 以
+    // untrusted_app 域执行本函数，访问 /dev 下的标记会被 SELinux
+    // 拒绝（avc denied: getattr），exists() 因此返回 false，导致
+    // 每次启动都误判"未应用"并重复执行 SUSFS apply（无 root 权限 →
+    // ioctl permission denied → 管理器报"授予 root 权限失败"）。
+    // 这里用 metadata 区分：仅当确实 NotFound 才继续 apply；
+    // 权限错误等其他情况一律视为"已应用"跳过。
+    match std::fs::metadata(APPLY_MARKER) {
+        Ok(_) => return,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => {
+            log::debug!("SUSFS apply marker inaccessible, skip re-apply: {e}");
+            return;
+        }
     }
     match load() {
         Ok(config) => {
@@ -212,6 +224,14 @@ pub fn restore_if_needed() {
     // 无论成功与否都标记已尝试，避免每条命令反复重试；
     // 失败时用户可显式执行 `ksud susfs add-*` 手动重试。
     let _ = std::fs::write(APPLY_MARKER, b"1");
+    // /dev 默认 device 标签会让 KSUN App 的 libksud(untrusted_app)
+    // 访问标记时触发 avc denied。改为 shell_data_file 使其可读，
+    // 这样 KSUN App 侧 exists() 能成功、走"已应用"跳过分支。
+    // 失败无碍：上面的 metadata 容错已保证权限错误也跳过 re-apply。
+    let _ = std::process::Command::new("/system/bin/chcon")
+        .arg("u:object_r:shell_data_file:s0")
+        .arg(APPLY_MARKER)
+        .output();
 }
 
 /// 从当前 susfsd 模块读取状态构建配置（用于后续保存）
