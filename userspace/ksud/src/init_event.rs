@@ -13,6 +13,29 @@ use rustix::process::chdir;
 use std::path::Path;
 use std::process::Command;
 
+/// KSUN App 的 libksud 以 untrusted_app 域运行,而 /data/adb/ksu 默认为
+/// 0700 root(adb_data_file)——App 侧读写 profile 目录会触发
+/// SELinux/权限拒绝(ksud 报 "is not a regular directory",Profile 模板
+/// 页拉取不到数据)。开机在此以 root 预创建 profile 目录并放宽为
+/// 0777 + shell_data_file,使 App 侧(SetTemplate/GetTemplate/
+/// ListTemplates/SetSepolicy)可正常读写;刷机/清 data 后自动生效,
+/// 无需任何手动操作。重复执行幂等(目录已存在则仅重设权限)。
+fn ensure_profile_dirs_accessible() {
+    for dir in [
+        crate::defs::PROFILE_DIR,
+        crate::defs::PROFILE_TEMPLATE_DIR,
+        crate::defs::PROFILE_SELINUX_DIR,
+    ] {
+        let _ = utils::ensure_dir_exists(dir);
+        let _ = std::process::Command::new("/system/bin/chmod")
+            .args(["0777", dir])
+            .output();
+        let _ = std::process::Command::new("/system/bin/chcon")
+            .args(["u:object_r:shell_data_file:s0", dir])
+            .output();
+    }
+}
+
 pub fn on_post_data_fs() -> Result<()> {
     utils::kmsg_dbg("on_post_data_fs enter");
     if let Err(e) = ksucalls::ensure_uapi_version_matched() {
@@ -31,6 +54,11 @@ pub fn on_post_data_fs() -> Result<()> {
     utils::kmsg_dbg("after report_post_fs_data");
 
     utils::umask(0);
+
+    // Profile 目录权限:让 App 内嵌 libksud(untrusted_app)可读写
+    // (见 ensure_profile_dirs_accessible 注释)。开机 root 预创建 +
+    // 放宽权限,刷机后自动生效,Profile 模板页无需手动修复。
+    ensure_profile_dirs_accessible();
 
     // Clear all temporary module configs early
     if let Err(e) = crate::module_config::clear_all_temp_configs() {
